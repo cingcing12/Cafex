@@ -16,9 +16,9 @@ export const useMainStore = defineStore('main', () => {
   // Products Database
   const products = ref(JSON.parse(localStorage.getItem('cafex_products')) || [
     { id: 1, name: 'Cappuccino', category: 'Coffee', price: 3.50, desc: 'Rich espresso with steamed milk foam.', image: 'https://images.unsplash.com/photo-1572442388796-11668a67e53d?w=600', reviews: [] },
-    { id: 2, name: 'Iced Matcha', category: 'Tea', price: 4.00, desc: 'Premium Japanese Matcha.', image: 'https://images.unsplash.com/photo-1515823664972-6d9094fb9430?w=600', reviews: [] },
+    { id: 2, name: 'Iced Matcha', category: 'Tea', price: 4.00, desc: 'Premium Japanese Matcha.', image: 'https://vancouverwithlove.com/wp-content/uploads/2025/03/iced-matcha-latte-8.jpg', reviews: [] },
     { id: 3, name: 'Cheesecake', category: 'Desserts', price: 4.50, desc: 'Classic NY Style Cheesecake.', image: 'https://images.unsplash.com/photo-1524351199678-941a58a3df50?w=600', reviews: [] },
-    { id: 4, name: 'Avocado Toast', category: 'Snacks', price: 5.50, desc: 'Sourdough bread.', image: 'https://images.unsplash.com/photo-1588137372308-15f75323a4dd?w=600', reviews: [] },
+    { id: 4, name: 'Avocado Toast', category: 'Snacks', price: 5.50, desc: 'Sourdough bread.', image: 'https://whatsgabycooking.com/wp-content/uploads/2023/01/Master.jpg', reviews: [] },
   ])
 
   const storeReviews = ref(JSON.parse(localStorage.getItem('cafex_store_reviews')) || [])
