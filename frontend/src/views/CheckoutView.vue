@@ -11,7 +11,8 @@ import {
   BanknotesIcon, 
   TruckIcon,
   ShoppingBagIcon,
-  ShieldCheckIcon
+  ShieldCheckIcon,
+  GiftIcon // Added Gift Icon for visual touch
 } from '@heroicons/vue/24/outline'
 
 const store = useMainStore()
@@ -26,7 +27,7 @@ if (store.cart.length === 0) {
 const paymentMethod = ref('cash')
 const showSuccess = ref(false)
 const isProcessing = ref(false)
-const saveInfo = ref(true) // Default to true for better UX
+const saveInfo = ref(true) 
 const deliveryFee = 1.50 
 
 // User Details Form
@@ -48,7 +49,7 @@ onMounted(() => {
   if (store.currentUser) {
     form.name = store.currentUser.name || ''
     form.phone = store.currentUser.phone || ''
-    form.address = store.currentUser.address || '' // Pre-fill address if saved
+    form.address = store.currentUser.address || ''
   }
 })
 
@@ -78,7 +79,6 @@ const handlePayment = () => {
   isProcessing.value = true
 
   setTimeout(() => {
-    // PASS DELIVERY DETAILS AND SAVE FLAG TO STORE
     store.placeOrder(
       paymentMethod.value, 
       {
@@ -87,7 +87,7 @@ const handlePayment = () => {
         address: form.address,
         note: form.note
       },
-      saveInfo.value // Pass the save preference
+      saveInfo.value
     )
     
     isProcessing.value = false
@@ -264,11 +264,21 @@ const handlePayment = () => {
                   <img :src="item.image" class="w-14 h-14 rounded-lg object-cover border border-gray-100">
                   <span class="absolute -top-2 -right-2 w-5 h-5 bg-gray-900 text-white text-[10px] font-bold rounded-full flex items-center justify-center border-2 border-white">{{ item.quantity }}</span>
                 </div>
+                
                 <div class="flex-1 min-w-0">
-                  <p class="font-bold text-gray-900 text-sm truncate">{{ item.name }}</p>
-                  <p class="text-xs text-gray-500">{{ formatCurrency(item.price) }}</p>
+                  <p class="font-bold text-gray-900 text-sm truncate flex items-center gap-1">
+                    {{ item.name }}
+                    <GiftIcon v-if="item.price === 0" class="w-3 h-3 text-green-500" />
+                  </p>
+                  
+                  <p :class="['text-xs', item.price === 0 ? 'text-green-600 font-bold' : 'text-gray-500']">
+                    {{ item.price === 0 ? 'FREE' : formatCurrency(item.price) }}
+                  </p>
                 </div>
-                <p class="font-bold text-gray-900 text-sm">{{ formatCurrency(item.price * item.quantity) }}</p>
+                
+                <p :class="['font-bold text-sm', item.price === 0 ? 'text-green-600' : 'text-gray-900']">
+                  {{ item.price * item.quantity === 0 ? 'FREE' : formatCurrency(item.price * item.quantity) }}
+                </p>
               </div>
             </div>
 
@@ -335,4 +345,4 @@ const handlePayment = () => {
 /* QR Expand Animation */
 .expand-enter-active, .expand-leave-active { transition: all 0.4s ease-in-out; overflow: hidden; max-height: 400px; opacity: 1; }
 .expand-enter-from, .expand-leave-to { max-height: 0; opacity: 0; margin-top: 0; padding: 0; }
-</style>
+</style>  

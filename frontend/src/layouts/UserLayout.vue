@@ -1,11 +1,11 @@
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue' // Added computed
 import { useRouter } from 'vue-router'
 import NavBar from '@/components/NavBar.vue'
 import Footer from '@/components/Footer.vue'
-import ToastContainer from '@/components/ToastContainer.vue' // New Toast System
+import ToastContainer from '@/components/ToastContainer.vue' 
 import { useMainStore } from '@/stores/mainStore'
-import { XMarkIcon, PlusIcon, MinusIcon } from '@heroicons/vue/24/outline'
+import { XMarkIcon, PlusIcon, MinusIcon, GiftIcon } from '@heroicons/vue/24/outline' // Added GiftIcon
 
 const store = useMainStore()
 const router = useRouter()
@@ -16,6 +16,11 @@ onMounted(() => window.addEventListener('toggle-cart', openCart))
 onUnmounted(() => window.removeEventListener('toggle-cart', openCart))
 
 const formatCurrency = (val) => `$${val.toFixed(2)}`
+
+// *** NEW: Calculate total here to use in multiple places ***
+const cartTotalValue = computed(() => {
+  return store.cart.reduce((total, item) => total + (item.price * item.quantity), 0)
+})
 
 const proceedToCheckout = () => {
   isCartOpen.value = false
@@ -61,8 +66,14 @@ const proceedToCheckout = () => {
               <div class="flex-1 flex flex-col justify-between">
                 <div class="flex justify-between items-start">
                   <div>
-                    <h4 class="font-bold text-gray-900 text-sm line-clamp-1">{{ item.name }}</h4>
-                    <div class="text-sm text-coffee-600 font-bold mt-0.5">{{ formatCurrency(item.price) }}</div>
+                    <h4 class="font-bold text-gray-900 text-sm line-clamp-1 flex items-center gap-1">
+                      {{ item.name }}
+                      <GiftIcon v-if="item.price === 0" class="w-3 h-3 text-green-500" />
+                    </h4>
+                    
+                    <div :class="['text-sm font-bold mt-0.5', item.price === 0 ? 'text-green-600' : 'text-coffee-600']">
+                      {{ item.price === 0 ? 'FREE' : formatCurrency(item.price) }}
+                    </div>
                   </div>
                 </div>
                 
@@ -86,11 +97,16 @@ const proceedToCheckout = () => {
           <div v-if="store.cart.length > 0" class="p-6 border-t border-gray-100 bg-white shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)] z-10">
             <div class="flex justify-between items-center text-sm text-gray-500 mb-2">
               <span>Subtotal</span>
-              <span>{{ formatCurrency(store.cart.reduce((s, i) => s + (i.price * i.quantity), 0)) }}</span>
+              <span :class="{ 'text-green-600 font-bold': cartTotalValue === 0 }">
+                {{ cartTotalValue === 0 ? 'FREE' : formatCurrency(cartTotalValue) }}
+              </span>
             </div>
+            
             <div class="flex justify-between items-end mb-6">
               <span class="text-xl font-bold text-gray-900">Total</span>
-              <span class="text-2xl font-extrabold text-coffee-600">{{ formatCurrency(store.cart.reduce((s, i) => s + (i.price * i.quantity), 0)) }}</span>
+              <span :class="['text-2xl font-extrabold', cartTotalValue === 0 ? 'text-green-600' : 'text-coffee-600']">
+                {{ cartTotalValue === 0 ? 'FREE' : formatCurrency(cartTotalValue) }}
+              </span>
             </div>
             
             <button 

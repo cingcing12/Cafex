@@ -10,7 +10,9 @@ import {
   SparklesIcon,
   TruckIcon,
   ShieldCheckIcon,
-  FireIcon
+  FireIcon,
+  GiftIcon,
+  CheckCircleIcon
 } from '@heroicons/vue/24/outline'
 import { 
   StarIcon as StarSolid, 
@@ -25,10 +27,13 @@ const newRating = ref(0)
 const newComment = ref('')
 const email = ref('')
 
+// --- CUSTOM ALERT STATE ---
+const showConfirmModal = ref(false)
+const productToRedeem = ref(null)
+
 const categories = ['All', 'Coffee', 'Tea', 'Snacks', 'Desserts']
 
 // --- COMPUTED ---
-
 const filteredProducts = computed(() => {
   return store.products.filter(p => {
     const matchesCategory = selectedCategory.value === 'All' || p.category === selectedCategory.value
@@ -37,16 +42,15 @@ const filteredProducts = computed(() => {
   })
 })
 
-// Get top 3 rated products for "Trending" section
 const featuredProducts = computed(() => {
   return [...store.products]
     .sort((a, b) => store.getAverageRating(b.reviews) - store.getAverageRating(a.reviews))
     .slice(0, 3)
 })
 
-// --- ACTIONS ---
-
 const formatCurrency = (val) => `$${val.toFixed(2)}`
+
+// --- ACTIONS ---
 
 const openProductModal = (product) => {
   selectedProduct.value = product
@@ -63,6 +67,28 @@ const submitProductReview = () => {
 
 const handleAddToCart = (product) => {
   store.addToCart(product)
+}
+
+// 1. OPEN CUSTOM MODAL INSTEAD OF BROWSER CONFIRM
+const initiateRedeem = (product) => {
+    if(store.loyaltyPoints < 100) {
+        store.showToast('You need 100 points!', 'error')
+        return
+    }
+    // Set the product and open the cool modal
+    productToRedeem.value = product
+    showConfirmModal.value = true
+}
+
+// 2. ACTUAL REDEEM ACTION (Called from Custom Modal)
+const confirmRedeem = () => {
+    if (productToRedeem.value) {
+        store.redeemReward(productToRedeem.value)
+        // Close modals
+        showConfirmModal.value = false
+        if(selectedProduct.value) selectedProduct.value = null
+        productToRedeem.value = null
+    }
 }
 
 const toggleWishlist = (product) => {
@@ -88,6 +114,11 @@ const subscribeNewsletter = () => {
       <img src="https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=1600" class="absolute inset-0 w-full h-full object-cover opacity-50">
       <div class="absolute inset-0 bg-gradient-to-t from-gray-900 via-transparent to-black/60"></div>
       
+      <div v-if="store.currentUser" class="absolute top-6 right-6 z-20 bg-white/10 backdrop-blur-md border border-white/20 text-white px-5 py-2 rounded-full flex items-center gap-2 shadow-lg animate-fade-in-up">
+        <GiftIcon class="w-5 h-5 text-yellow-400" />
+        <span class="font-bold">{{ store.loyaltyPoints }} Points</span>
+      </div>
+
       <div class="relative z-10 max-w-7xl mx-auto px-4 w-full text-center md:text-left">
         <div class="max-w-3xl animate-fade-in-up">
           <span class="inline-block py-1 px-3 rounded-full bg-coffee-600/20 border border-coffee-500/50 text-coffee-400 font-bold tracking-widest uppercase text-xs mb-4 backdrop-blur-sm">
@@ -205,7 +236,11 @@ const subscribeNewsletter = () => {
             <div @click="openProductModal(product)" class="h-60 overflow-hidden bg-gray-100 cursor-pointer relative">
               <img :src="product.image" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
               
-              <div v-if="store.getAverageRating(product.reviews) >= 4.5" class="absolute top-3 left-3 bg-yellow-400 text-yellow-900 text-[10px] font-bold px-2 py-1 rounded shadow-sm">
+              <div v-if="store.currentUser && product.price <= 2.50 && store.loyaltyPoints >= 100" class="absolute top-3 left-3 bg-green-500 text-white text-[10px] font-bold px-2 py-1 rounded shadow-sm z-10 flex items-center gap-1">
+                 <GiftIcon class="w-3 h-3" /> FREE (100 Pts)
+              </div>
+              
+              <div v-if="store.getAverageRating(product.reviews) >= 4.5" class="absolute top-3 right-12 bg-yellow-400 text-yellow-900 text-[10px] font-bold px-2 py-1 rounded shadow-sm">
                 TOP RATED
               </div>
 
@@ -236,17 +271,29 @@ const subscribeNewsletter = () => {
               </div>
               
               <div class="flex items-center gap-1 mb-4">
-                 <StarSolid class="w-4 h-4 text-yellow-400" /> 
-                 <span class="font-bold text-gray-900 text-sm">{{ store.getAverageRating(product.reviews) }}</span>
-                 <span class="text-xs text-gray-400">({{ product.reviews.length }} reviews)</span>
+                  <StarSolid class="w-4 h-4 text-yellow-400" /> 
+                  <span class="font-bold text-gray-900 text-sm">{{ store.getAverageRating(product.reviews) }}</span>
+                  <span class="text-xs text-gray-400">({{ product.reviews.length }} reviews)</span>
               </div>
 
-              <button 
-                @click="handleAddToCart(product)" 
-                class="mt-auto w-full bg-gray-900 text-white py-3 rounded-xl font-bold text-sm hover:bg-coffee-600 active:scale-95 transition-all flex items-center justify-center gap-2"
-              >
-                <ShoppingBagIcon class="w-5 h-5" /> Add to Cart
-              </button>
+              <div class="mt-auto space-y-2">
+                 
+                 <button 
+                   v-if="store.currentUser && product.price <= 2.50 && store.loyaltyPoints >= 100"
+                   @click="initiateRedeem(product)" 
+                   class="w-full bg-green-600 text-white py-2 rounded-xl font-bold text-sm hover:bg-green-500 active:scale-95 transition-all flex items-center justify-center gap-2"
+                 >
+                   <GiftIcon class="w-5 h-5" /> Redeem (100 pts)
+                 </button>
+
+                 <button 
+                   @click="handleAddToCart(product)" 
+                   class="w-full bg-gray-900 text-white py-3 rounded-xl font-bold text-sm hover:bg-coffee-600 active:scale-95 transition-all flex items-center justify-center gap-2"
+                 >
+                   <ShoppingBagIcon class="w-5 h-5" /> Add to Cart
+                 </button>
+              </div>
+
             </div>
           </div>
         </div>
@@ -283,7 +330,7 @@ const subscribeNewsletter = () => {
     </div>
 
     <transition name="fade">
-      <div v-if="selectedProduct" class="fixed inset-0 z-50 flex items-center justify-center px-4">
+      <div v-if="selectedProduct" class="fixed inset-0 z-40 flex items-center justify-center px-4">
         <div class="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity" @click="selectedProduct = null"></div>
         
         <div class="bg-white rounded-3xl w-full max-w-4xl max-h-[90vh] overflow-y-auto relative z-10 grid md:grid-cols-2 shadow-2xl overflow-hidden animate-zoom-in">
@@ -312,17 +359,30 @@ const subscribeNewsletter = () => {
             </div>
 
             <div class="mt-auto pt-6 border-t border-gray-100">
-               <div class="flex items-center justify-between mb-8">
-                 <div>
-                   <span class="block text-gray-400 text-xs font-bold uppercase">Price</span>
-                   <span class="text-3xl font-extrabold text-coffee-600">{{ formatCurrency(selectedProduct.price) }}</span>
-                 </div>
-                 <button 
-                   @click="handleAddToCart(selectedProduct); selectedProduct = null" 
-                   class="bg-gray-900 text-white px-8 py-3 rounded-2xl font-bold text-lg hover:bg-coffee-600 transition shadow-xl active:scale-95"
-                 >
-                   Add to Order
-                 </button>
+               <div class="flex flex-col gap-4 mb-8">
+                   <div class="flex items-center justify-between">
+                      <div>
+                        <span class="block text-gray-400 text-xs font-bold uppercase">Price</span>
+                        <span class="text-3xl font-extrabold text-coffee-600">{{ formatCurrency(selectedProduct.price) }}</span>
+                      </div>
+                   </div>
+
+                   <div class="space-y-3">
+                      <button 
+                        v-if="store.currentUser && selectedProduct.price <= 2.50 && store.loyaltyPoints >= 100"
+                        @click="initiateRedeem(selectedProduct)" 
+                        class="w-full bg-green-600 text-white px-8 py-3 rounded-2xl font-bold text-lg hover:bg-green-500 transition shadow-xl active:scale-95 flex items-center justify-center gap-2"
+                      >
+                        <GiftIcon class="w-6 h-6" /> Redeem (100 pts)
+                      </button>
+
+                      <button 
+                        @click="handleAddToCart(selectedProduct); selectedProduct = null" 
+                        class="w-full bg-gray-900 text-white px-8 py-3 rounded-2xl font-bold text-lg hover:bg-coffee-600 transition shadow-xl active:scale-95 flex items-center justify-center gap-2"
+                      >
+                        <ShoppingBagIcon class="w-6 h-6" /> Add to Order
+                      </button>
+                   </div>
                </div>
 
                <div class="bg-gray-50 rounded-xl p-5 border border-gray-100">
@@ -334,19 +394,42 @@ const subscribeNewsletter = () => {
                    <input v-model="newComment" type="text" placeholder="Your thoughts..." class="w-full text-sm border-none bg-white rounded-lg px-3 py-2 shadow-sm focus:ring-2 ring-coffee-500 outline-none">
                    <button @click="submitProductReview" class="text-xs bg-gray-900 text-white px-4 rounded-lg font-bold hover:bg-gray-800 transition">Post</button>
                  </div>
-                 
-                 <div v-if="selectedProduct.reviews.length > 0" class="mt-4 pt-4 border-t border-gray-200 max-h-32 overflow-y-auto space-y-3 custom-scrollbar">
-                    <div v-for="r in selectedProduct.reviews.slice().reverse()" :key="r.id" class="text-sm">
-                        <div class="flex justify-between items-center">
-                            <span class="font-bold text-gray-900">{{ r.user }}</span>
-                            <span class="text-yellow-500 text-xs font-bold">★ {{ r.rating }}</span>
-                        </div>
-                        <p class="text-gray-500 text-xs mt-0.5">{{ r.comment }}</p>
-                    </div>
-                 </div>
                </div>
             </div>
           </div>
+        </div>
+      </div>
+    </transition>
+
+    <transition name="fade">
+      <div v-if="showConfirmModal" class="fixed inset-0 z-[60] flex items-center justify-center px-4">
+        <div class="absolute inset-0 bg-gray-900/60 backdrop-blur-sm transition-opacity" @click="showConfirmModal = false"></div>
+        
+        <div class="bg-white rounded-3xl p-8 max-w-sm w-full text-center relative z-10 shadow-2xl animate-zoom-in border border-gray-100">
+           <div class="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6 ring-8 ring-green-50">
+             <GiftIcon class="w-10 h-10 text-green-600 animate-bounce" />
+           </div>
+           
+           <h3 class="text-2xl font-extrabold text-gray-900 mb-2">Redeem Reward?</h3>
+           <p class="text-gray-500 mb-8">
+             Spend <span class="font-bold text-green-600">100 points</span> to get <br>
+             <span class="font-bold text-gray-900">"{{ productToRedeem?.name }}"</span> for free?
+           </p>
+
+           <div class="flex gap-3">
+             <button 
+               @click="showConfirmModal = false" 
+               class="flex-1 py-3 rounded-xl font-bold text-gray-500 bg-gray-100 hover:bg-gray-200 transition"
+             >
+               Cancel
+             </button>
+             <button 
+               @click="confirmRedeem" 
+               class="flex-1 py-3 rounded-xl font-bold text-white bg-green-600 hover:bg-green-500 shadow-lg shadow-green-200 transition transform hover:-translate-y-1"
+             >
+               Yes, Redeem!
+             </button>
+           </div>
         </div>
       </div>
     </transition>

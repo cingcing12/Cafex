@@ -15,7 +15,8 @@ import {
   PhoneIcon,
   XMarkIcon,
   ArchiveBoxXMarkIcon,
-  ExclamationTriangleIcon // Ensure this is imported for the cancel modal
+  ExclamationTriangleIcon,
+  GiftIcon // Added Gift Icon
 } from '@heroicons/vue/24/outline'
 
 const store = useMainStore()
@@ -25,24 +26,19 @@ const selectedOrder = ref(null)
 const isEditing = ref(false)
 const showSaveMessage = ref(false)
 
-// Custom Cancel Modal State
 const showCancelModal = ref(false)
 const orderToCancel = ref(null)
 
-// Redirect if not logged in
 if (!store.currentUser) {
   router.push('/login')
 }
 
-// Form State
 const editForm = ref({
   name: store.currentUser?.name || '',
   email: store.currentUser?.email || '',
   phone: store.currentUser?.phone || '',
   password: store.currentUser?.password || ''
 })
-
-// --- ACTIONS ---
 
 const handleSaveProfile = () => {
   store.updateProfile(editForm.value)
@@ -69,7 +65,6 @@ const closeOrderDetails = () => {
   selectedOrder.value = null
 }
 
-// Updated Cancel Logic with Custom Modal
 const promptCancel = (orderId) => {
   orderToCancel.value = orderId
   showCancelModal.value = true
@@ -80,11 +75,9 @@ const confirmCancel = () => {
     store.cancelOrder(orderToCancel.value)
     showCancelModal.value = false
     orderToCancel.value = null
-    selectedOrder.value = null // Close detail modal
+    selectedOrder.value = null
   }
 }
-
-// --- HELPERS ---
 
 const points = computed(() => store.loyaltyPoints)
 const progressWidth = computed(() => Math.min(points.value, 100) + '%')
@@ -212,7 +205,9 @@ const canCancel = (status) => status === 'Pending'
                       </div>
                     </div>
                     <div class="text-right">
-                      <p class="text-lg font-extrabold text-gray-900">${{ order.total.toFixed(2) }}</p>
+                      <p :class="['text-lg font-extrabold', order.total === 0 ? 'text-green-600' : 'text-gray-900']">
+                        {{ order.total === 0 ? 'FREE' : '$' + order.total.toFixed(2) }}
+                      </p>
                       <span class="text-xs font-bold text-coffee-600 hover:underline">View Details &rarr;</span>
                     </div>
                   </div>
@@ -301,11 +296,16 @@ const canCancel = (status) => status === 'Pending'
                   <div class="flex items-center gap-3">
                     <img :src="item.image" class="w-12 h-12 rounded-lg object-cover">
                     <div>
-                      <p class="font-bold text-gray-900 text-sm">{{ item.name }}</p>
+                      <p class="font-bold text-gray-900 text-sm flex items-center gap-1">
+                        {{ item.name }}
+                        <GiftIcon v-if="item.price === 0" class="w-3 h-3 text-green-500" />
+                      </p>
                       <p class="text-xs text-gray-500">x{{ item.quantity }}</p>
                     </div>
                   </div>
-                  <p class="font-bold text-gray-900 text-sm">${{ (item.price * item.quantity).toFixed(2) }}</p>
+                  <p :class="['font-bold text-sm', item.price === 0 ? 'text-green-600' : 'text-gray-900']">
+                    {{ item.price === 0 ? 'FREE' : '$' + (item.price * item.quantity).toFixed(2) }}
+                  </p>
                 </div>
               </div>
             </div>
@@ -334,7 +334,9 @@ const canCancel = (status) => status === 'Pending'
 
             <div class="flex justify-between items-center pt-4 border-t border-gray-100">
               <span class="text-gray-500 font-medium">Total Amount</span>
-              <span class="text-2xl font-extrabold text-coffee-600">${{ selectedOrder.total.toFixed(2) }}</span>
+              <span :class="['text-2xl font-extrabold', selectedOrder.total === 0 ? 'text-green-600' : 'text-coffee-600']">
+                {{ selectedOrder.total === 0 ? 'FREE' : '$' + selectedOrder.total.toFixed(2) }}
+              </span>
             </div>
           </div>
 

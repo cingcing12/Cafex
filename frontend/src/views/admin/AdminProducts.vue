@@ -12,7 +12,8 @@ import {
   PhotoIcon,
   ExclamationTriangleIcon,
   CurrencyDollarIcon,
-  TagIcon
+  TagIcon,
+  FunnelIcon // Added Icon
 } from '@heroicons/vue/24/outline'
 
 const store = useMainStore()
@@ -22,9 +23,12 @@ const showModal = ref(false)
 const showDeleteModal = ref(false)
 const productToDelete = ref(null)
 const isEditing = ref(false)
-const viewMode = ref('grid') // 'grid' or 'list'
+const viewMode = ref('grid') 
 const searchQuery = ref('')
+const selectedFilterCategory = ref('All') // New Filter State
+
 const categories = ['Coffee', 'Tea', 'Snacks', 'Desserts']
+const filterCategories = ['All', ...categories] // For the tabs
 
 // Form Data
 const form = reactive({ 
@@ -36,34 +40,34 @@ const form = reactive({
   desc: '' 
 })
 
-// Computed
+// --- UPDATED COMPUTED PROPERTY ---
 const filteredProducts = computed(() => {
-  if (!searchQuery.value) return store.products
-  const query = searchQuery.value.toLowerCase()
-  return store.products.filter(p => 
-    p.name.toLowerCase().includes(query) || 
-    p.category.toLowerCase().includes(query)
-  )
+  return store.products.filter(p => {
+    // 1. Filter by Category Tab
+    const matchesCategory = selectedFilterCategory.value === 'All' || p.category === selectedFilterCategory.value
+    
+    // 2. Filter by Search Query (Name)
+    const matchesSearch = p.name.toLowerCase().includes(searchQuery.value.toLowerCase())
+    
+    return matchesCategory && matchesSearch
+  })
 })
 
 // --- ACTIONS ---
 
 const openAdd = () => {
   isEditing.value = false
-  // Reset Form
   Object.assign(form, { id: Date.now(), name: '', category: 'Coffee', price: '', image: '', desc: '' })
   showModal.value = true
 }
 
 const openEdit = (p) => {
   isEditing.value = true
-  // Clone data to form
   Object.assign(form, p)
   showModal.value = true
 }
 
 const handleSave = () => {
-  // Basic Validation
   if (!form.name || !form.price) {
     store.showToast('Please fill in Name and Price.', 'error')
     return
@@ -72,16 +76,13 @@ const handleSave = () => {
   const payload = { ...form, price: parseFloat(form.price) }
 
   if (isEditing.value) {
-    // Update existing (Find index logic handles inside component for simplicity or store)
-    // Ideally store should have updateProduct action, but we can do it here manually for local array
     const idx = store.products.findIndex(p => p.id === payload.id)
     if (idx !== -1) {
       store.products[idx] = payload
-      store.saveToStorage() // Ensure persistence
+      store.saveToStorage()
       store.showToast('Product updated successfully!', 'success')
     }
   } else {
-    // Add New
     store.addProduct(payload)
     store.showToast('New product created!', 'success')
   }
@@ -89,7 +90,6 @@ const handleSave = () => {
   showModal.value = false
 }
 
-// Custom Delete Logic
 const promptDelete = (id) => {
   productToDelete.value = id
   showDeleteModal.value = true
@@ -110,47 +110,67 @@ const formatCurrency = (val) => `$${parseFloat(val).toFixed(2)}`
 <template>
   <div class="space-y-8 animate-fade-in pb-20">
     
-    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
-      <div>
-        <h2 class="text-3xl font-extrabold text-gray-900 tracking-tight">Menu Manager</h2>
-        <p class="text-gray-500 text-sm mt-1">Manage your product catalog.</p>
-      </div>
-
-      <div class="flex flex-wrap items-center gap-3 w-full md:w-auto">
-        <div class="relative flex-grow md:flex-grow-0 md:w-64">
-          <MagnifyingGlassIcon class="w-5 h-5 text-gray-400 absolute left-3 top-3" />
-          <input 
-            v-model="searchQuery" 
-            type="text" 
-            placeholder="Search items..." 
-            class="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-transparent focus:bg-white focus:border-coffee-500 focus:ring-4 focus:ring-coffee-500/10 rounded-2xl outline-none text-sm transition-all"
-          >
-        </div>
-
-        <div class="flex bg-gray-100 p-1 rounded-xl">
-          <button @click="viewMode = 'grid'" :class="['p-2 rounded-lg transition-all', viewMode === 'grid' ? 'bg-white shadow text-coffee-600' : 'text-gray-400 hover:text-gray-600']">
-            <Squares2X2Icon class="w-5 h-5" />
-          </button>
-          <button @click="viewMode = 'list'" :class="['p-2 rounded-lg transition-all', viewMode === 'list' ? 'bg-white shadow text-coffee-600' : 'text-gray-400 hover:text-gray-600']">
-            <ListBulletIcon class="w-5 h-5" />
-          </button>
+    <div class="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex flex-col gap-6">
+      
+      <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <h2 class="text-3xl font-extrabold text-gray-900 tracking-tight">Menu Manager</h2>
+          <p class="text-gray-500 text-sm mt-1">Manage your product catalog.</p>
         </div>
 
         <button 
           @click="openAdd" 
-          class="hidden md:flex items-center gap-2 bg-coffee-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-coffee-700 transition shadow-lg shadow-coffee-200 active:scale-95"
+          class="flex items-center gap-2 bg-gray-900 text-white px-5 py-3 rounded-xl font-bold text-sm hover:bg-coffee-600 transition shadow-lg shadow-gray-200 active:scale-95"
         >
-          <PlusIcon class="w-5 h-5" /> Add Item
+          <PlusIcon class="w-5 h-5" /> Add New Item
         </button>
+      </div>
+
+      <div class="flex flex-col md:flex-row gap-4 items-center justify-between border-t border-gray-100 pt-6">
+        
+        <div class="flex bg-gray-100/80 p-1.5 rounded-xl overflow-x-auto no-scrollbar w-full md:w-auto">
+           <button 
+             v-for="cat in filterCategories" 
+             :key="cat"
+             @click="selectedFilterCategory = cat"
+             :class="['px-4 py-2 text-xs font-bold rounded-lg transition-all whitespace-nowrap', 
+               selectedFilterCategory === cat ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-900']"
+           >
+             {{ cat }}
+           </button>
+        </div>
+
+        <div class="flex gap-3 w-full md:w-auto">
+          <div class="relative flex-grow md:w-64">
+            <MagnifyingGlassIcon class="w-5 h-5 text-gray-400 absolute left-3 top-2.5" />
+            <input 
+              v-model="searchQuery" 
+              type="text" 
+              placeholder="Search items..." 
+              class="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-transparent focus:bg-white focus:border-coffee-500 focus:ring-4 focus:ring-coffee-500/10 rounded-xl outline-none text-sm transition-all font-medium"
+            >
+          </div>
+
+          <div class="flex bg-gray-100 p-1 rounded-xl shrink-0">
+            <button @click="viewMode = 'grid'" :class="['p-2 rounded-lg transition-all', viewMode === 'grid' ? 'bg-white shadow text-coffee-600' : 'text-gray-400 hover:text-gray-600']">
+              <Squares2X2Icon class="w-5 h-5" />
+            </button>
+            <button @click="viewMode = 'list'" :class="['p-2 rounded-lg transition-all', viewMode === 'list' ? 'bg-white shadow text-coffee-600' : 'text-gray-400 hover:text-gray-600']">
+              <ListBulletIcon class="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
       </div>
     </div>
 
     <div v-if="filteredProducts.length === 0" class="text-center py-24 bg-white rounded-3xl border border-dashed border-gray-300">
       <div class="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4 text-gray-300">
-        <MagnifyingGlassIcon class="w-10 h-10" />
+        <FunnelIcon class="w-10 h-10" />
       </div>
       <h3 class="text-xl font-bold text-gray-900">No items found</h3>
-      <p class="text-gray-500 mt-1">Try adjusting your search or add a new item.</p>
+      <p class="text-gray-500 mt-1">Try changing the category filter or search term.</p>
+      <button @click="selectedFilterCategory = 'All'; searchQuery = ''" class="mt-6 text-coffee-600 font-bold hover:underline">Clear Filters</button>
     </div>
 
     <div v-else-if="viewMode === 'grid'" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -165,7 +185,6 @@ const formatCurrency = (val) => `$${parseFloat(val).toFixed(2)}`
             class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
             @error="$event.target.src='https://via.placeholder.com/300?text=No+Image'" 
           >
-          
           <div class="absolute top-4 right-4 bg-white/90 backdrop-blur px-3 py-1 rounded-lg text-xs font-bold shadow-sm uppercase tracking-wide text-coffee-700">
             {{ product.category }}
           </div>
@@ -242,13 +261,6 @@ const formatCurrency = (val) => `$${parseFloat(val).toFixed(2)}`
         </table>
       </div>
     </div>
-
-    <button 
-      @click="openAdd" 
-      class="md:hidden fixed bottom-6 right-6 w-14 h-14 bg-coffee-600 text-white rounded-full shadow-2xl flex items-center justify-center z-40 active:scale-90 transition-transform"
-    >
-      <PlusIcon class="w-8 h-8" />
-    </button>
 
     <transition name="modal">
       <div v-if="showModal" class="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -356,4 +368,7 @@ const formatCurrency = (val) => `$${parseFloat(val).toFixed(2)}`
 .modal-enter-from, .modal-leave-to { opacity: 0; }
 .modal-enter-active .transform, .modal-leave-active .transform { transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); }
 .modal-enter-from .transform { transform: scale(0.95) translateY(10px); opacity: 0; }
+
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 </style>
