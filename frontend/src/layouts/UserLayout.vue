@@ -57,7 +57,7 @@ const proceedToCheckout = () => {
             <div v-if="store.cart.length === 0" class="flex flex-col items-center justify-center h-64 text-gray-400">
               <span class="text-6xl mb-4 grayscale opacity-50">🛒</span>
               <p class="font-medium text-gray-500">Your cart is empty.</p>
-              <button @click="isCartOpen = false" class="mt-4 text-coffee-600 font-bold hover:underline bg-coffee-50 px-6 py-2 rounded-full transition">Start Shopping</button>
+              <router-link to="/" @click="isCartOpen = false" class="mt-4 text-coffee-600 font-bold hover:underline bg-coffee-50 px-6 py-2 rounded-full transition">Start Shopping</router-link>
             </div>
 
             <div v-for="item in store.cart" :key="item.id" class="flex gap-4 p-4 bg-white border border-gray-100 rounded-2xl shadow-sm hover:shadow-md transition-all group">

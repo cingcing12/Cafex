@@ -5,7 +5,10 @@ import {
   EnvelopeIcon, 
   MapPinIcon, 
   ChevronDownIcon, 
-  PaperAirplaneIcon 
+  PaperAirplaneIcon,
+  CheckCircleIcon,
+  XMarkIcon,
+  ExclamationCircleIcon
 } from '@heroicons/vue/24/outline'
 
 // Form State
@@ -15,7 +18,8 @@ const form = ref({
   message: ''
 })
 const isSending = ref(false)
-const showSuccess = ref(false)
+const showSuccessModal = ref(false)
+const toast = ref({ show: false, message: '' })
 
 // FAQ Data
 const faqs = ref([
@@ -45,24 +49,30 @@ const toggleFaq = (index) => {
   faqs.value[index].open = !faqs.value[index].open
 }
 
+const triggerToast = (msg) => {
+  toast.value.message = msg
+  toast.value.show = true
+  setTimeout(() => { toast.value.show = false }, 3000)
+}
+
 const handleSubmit = () => {
-  if(!form.value.name || !form.value.email) return alert('Please fill in required fields')
+  if(!form.value.name || !form.value.email) {
+    return triggerToast('Please fill in required fields')
+  }
   
   isSending.value = true
   
   // Simulate API call
   setTimeout(() => {
     isSending.value = false
-    showSuccess.value = true
+    showSuccessModal.value = true
     form.value = { name: '', email: '', message: '' }
-    
-    setTimeout(() => showSuccess.value = false, 5000)
   }, 1500)
 }
 </script>
 
 <template>
-  <div class="min-h-screen bg-gray-50 font-sans">
+  <div class="min-h-screen bg-gray-50 font-sans relative overflow-x-hidden">
     
     <div class="relative h-[400px] flex items-center justify-center overflow-hidden bg-fixed bg-center bg-cover" 
          style="background-image: url('https://images.unsplash.com/photo-1497935586351-b67a49e012bf?w=1600');">
@@ -77,11 +87,9 @@ const handleSubmit = () => {
     </div>
 
     <div class="max-w-7xl mx-auto px-4 py-16 -mt-20 relative z-20">
-      
       <div class="grid lg:grid-cols-3 gap-8">
         
         <div class="space-y-6 animate-fade-in-up" style="animation-delay: 0.1s;">
-          
           <div class="bg-white p-6 rounded-2xl shadow-md border border-gray-100 flex items-center gap-5 hover:-translate-y-1 transition-transform duration-300">
             <div class="w-14 h-14 bg-coffee-50 rounded-full flex items-center justify-center text-coffee-600 shadow-sm">
               <PhoneIcon class="w-6 h-6" />
@@ -98,7 +106,7 @@ const handleSubmit = () => {
             </div>
             <div>
               <h3 class="font-bold text-gray-900 text-lg">Email</h3>
-              <p class="text-gray-500 text-sm font-medium">hello@cafex.com</p>
+              <p class="text-gray-500 text-sm font-medium">caféX@gmail.com</p>
             </div>
           </div>
 
@@ -149,54 +157,76 @@ const handleSubmit = () => {
                 <span v-else>Send Message</span>
                 <PaperAirplaneIcon v-if="!isSending" class="w-5 h-5 -rotate-45 mt-[-2px]" />
               </button>
-
-              <transition name="fade">
-                <div v-if="showSuccess" class="mt-4 p-4 bg-green-50 text-green-700 rounded-xl font-medium flex items-center gap-3 border border-green-100">
-                  <span class="bg-green-200 p-1 rounded-full text-green-800">✓</span> 
-                  Message sent successfully! We will contact you soon.
-                </div>
-              </transition>
             </div>
           </form>
         </div>
-
       </div>
 
       <div class="mt-24 max-w-3xl mx-auto">
         <h2 class="text-3xl font-bold text-center text-gray-900 mb-10">Frequently Asked Questions</h2>
-        
         <div class="space-y-4">
           <div v-for="(faq, index) in faqs" :key="index" class="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm transition-all duration-300 hover:shadow-md" :class="faq.open ? 'ring-2 ring-coffee-100' : ''">
-            <button 
-              @click="toggleFaq(index)" 
-              class="w-full flex justify-between items-center p-6 text-left"
-            >
+            <button @click="toggleFaq(index)" class="w-full flex justify-between items-center p-6 text-left">
               <span class="font-bold text-gray-900 text-lg">{{ faq.q }}</span>
               <span class="bg-gray-100 rounded-full p-2 transition-transform duration-300" :class="faq.open ? 'rotate-180 bg-coffee-100 text-coffee-600' : 'text-gray-400'">
                  <ChevronDownIcon class="w-5 h-5" />
               </span>
             </button>
-            
-            <div 
-              class="overflow-hidden transition-all duration-300 ease-in-out"
-              :style="{ maxHeight: faq.open ? '200px' : '0px', opacity: faq.open ? '1' : '0' }"
-            >
-              <div class="p-6 pt-0 text-gray-600 leading-relaxed">
-                {{ faq.a }}
-              </div>
+            <div class="overflow-hidden transition-all duration-300 ease-in-out" :style="{ maxHeight: faq.open ? '200px' : '0px', opacity: faq.open ? '1' : '0' }">
+              <div class="p-6 pt-0 text-gray-600 leading-relaxed">{{ faq.a }}</div>
             </div>
           </div>
         </div>
       </div>
-
     </div>
+
+    <transition name="toast">
+      <div v-if="toast.show" class="fixed top-6 right-6 z-[110] flex items-center gap-3 bg-white border-l-4 border-red-500 px-6 py-4 rounded-2xl shadow-2xl">
+        <ExclamationCircleIcon class="w-6 h-6 text-red-500" />
+        <span class="font-bold text-gray-900">{{ toast.message }}</span>
+      </div>
+    </transition>
+
+    <transition name="fade">
+      <div v-if="showSuccessModal" class="fixed inset-0 z-[100] flex items-center justify-center px-4">
+        <div class="absolute inset-0 bg-gray-900/60 backdrop-blur-md" @click="showSuccessModal = false"></div>
+        <div class="bg-white rounded-[2.5rem] p-10 max-w-sm w-full text-center relative z-10 shadow-2xl animate-zoom-in border border-white/20">
+          <button @click="showSuccessModal = false" class="absolute top-6 right-6 text-gray-300 hover:text-gray-900 transition-colors">
+            <XMarkIcon class="w-6 h-6" />
+          </button>
+          <div class="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6 ring-8 ring-green-50 relative">
+            <CheckCircleIcon class="w-12 h-12 text-green-600 animate-bounce-slow" />
+            <div class="absolute -top-1 -right-1 w-6 h-6 bg-green-500 rounded-full border-4 border-white animate-ping"></div>
+          </div>
+          <h3 class="text-3xl font-black text-gray-900 mb-3 tracking-tight">Sent!</h3>
+          <p class="text-gray-500 mb-8 leading-relaxed">
+            Your message is on its way. We'll get back to you within <span class="text-coffee-600 font-bold">24 hours</span>.
+          </p>
+          <button @click="showSuccessModal = false" class="w-full py-4 rounded-2xl font-bold text-white bg-gray-900 hover:bg-coffee-600 shadow-xl shadow-gray-200 transition-all transform hover:-translate-y-1 active:scale-95">
+            Done
+          </button>
+        </div>
+      </div>
+    </transition>
+
   </div>
 </template>
 
 <style scoped>
-.fade-enter-active, .fade-leave-active { transition: opacity 0.5s ease; }
+/* Modal Transitions */
+.fade-enter-active, .fade-leave-active { transition: opacity 0.4s ease; }
 .fade-enter-from, .fade-leave-to { opacity: 0; }
 
+/* Toast Transitions */
+.toast-enter-active { animation: toast-in 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+.toast-leave-active { animation: toast-in 0.4s reverse ease-in; }
+
+@keyframes toast-in {
+  from { transform: translateX(100%) scale(0.9); opacity: 0; }
+  to { transform: translateX(0) scale(1); opacity: 1; }
+}
+
+/* Animations */
 .animate-fade-in-up {
   animation: fadeInUp 0.8s ease-out forwards;
   opacity: 0;
@@ -206,4 +236,26 @@ const handleSubmit = () => {
 @keyframes fadeInUp {
   to { opacity: 1; transform: translateY(0); }
 }
+
+.animate-zoom-in { 
+  animation: zoomIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
+}
+
+@keyframes zoomIn { 
+  from { opacity: 0; transform: scale(0.8) translateY(30px); } 
+  to { opacity: 1; transform: scale(1) translateY(0); } 
+}
+
+@keyframes bounce-slow {
+  0%, 100% { transform: translateY(-8%); }
+  50% { transform: translateY(0); }
+}
+.animate-bounce-slow { animation: bounce-slow 2s infinite; }
+
+/* Theme Colors */
+.bg-coffee-50 { background-color: #fdfaf7; }
+.bg-coffee-600 { background-color: #6F4E37; }
+.text-coffee-600 { color: #6F4E37; }
+.focus\:border-coffee-500:focus { border-color: #6F4E37; }
+.focus\:ring-coffee-500\/10:focus { --tw-ring-color: rgba(111, 78, 55, 0.1); }
 </style>
