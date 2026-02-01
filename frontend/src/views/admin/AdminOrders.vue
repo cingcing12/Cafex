@@ -76,9 +76,9 @@ const getStatusColor = (status) => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-gray-50/50 pb-20 font-sans">
+  <div class="min-h-screen bg-gray-50/50 pb-20 font-sans relative">
     
-    <div class="sticky top-0 z-30 bg-white/80 backdrop-blur-xl border-b border-gray-200/50 px-4 py-4 transition-all duration-300">
+    <div class="sticky top-0 z-20 bg-white/80 backdrop-blur-xl border-b border-gray-200/50 px-4 py-4 transition-all duration-300">
       <div class="max-w-7xl mx-auto flex flex-col xl:flex-row justify-between items-start xl:items-center gap-6">
         <div>
           <h2 class="text-2xl font-black text-gray-900 tracking-tight flex items-center gap-2">
@@ -129,8 +129,8 @@ const getStatusColor = (status) => {
               </div>
             </div>
             <div class="text-right">
-               <p :class="['text-lg font-black', order.total === 0 ? 'text-green-500' : 'text-gray-900']">
-                 {{ order.total === 0 ? 'FREE' : '$' + order.total.toFixed(2) }}
+               <p :class="['text-lg font-black', parseFloat(order.total) === 0 ? 'text-green-500' : 'text-gray-900']">
+                 {{ parseFloat(order.total) === 0 ? 'FREE' : '$' + parseFloat(order.total).toFixed(2) }}
                </p>
                <span class="text-[10px] text-gray-400 font-medium">{{ formatDate(order.date) }}</span>
             </div>
@@ -209,8 +209,8 @@ const getStatusColor = (status) => {
     </div>
 
     <transition name="modal">
-      <div v-if="showDeleteModal" class="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div class="absolute inset-0 bg-gray-900/40 backdrop-blur-sm transition-opacity" @click="showDeleteModal = false"></div>
+      <div v-if="showDeleteModal" class="fixed inset-0 z-[100] flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-gray-900/60 backdrop-blur-sm transition-opacity" @click="showDeleteModal = false"></div>
         <div class="bg-white w-full max-w-sm rounded-[2rem] shadow-2xl relative z-10 p-6 transform transition-all scale-100 border border-white/20">
           <div class="w-14 h-14 bg-rose-50 text-rose-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-inner">
             <ExclamationTriangleIcon class="w-7 h-7" />

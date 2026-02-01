@@ -33,7 +33,7 @@ const isActive = (path) => route.path.includes(path)
 <template>
   <div class="flex h-screen bg-gray-50 font-sans overflow-hidden">
     
-    <div v-if="isMobileMenuOpen" @click="isMobileMenuOpen = false" class="fixed inset-0 bg-black/50 z-20 lg:hidden backdrop-blur-sm transition-opacity"></div>
+    <div v-if="isMobileMenuOpen" @click="isMobileMenuOpen = false" class="fixed inset-0 bg-black/50 z-30 lg:hidden backdrop-blur-sm transition-opacity"></div>
 
     <aside :class="['fixed lg:static inset-y-0 left-0 w-72 bg-gray-900 text-white flex flex-col shadow-2xl z-30 transform transition-transform duration-300 ease-in-out', isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0']">
       
