@@ -1,29 +1,32 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useMainStore } from '@/stores/mainStore'
 import { 
-  ChartBarIcon, 
-  ShoppingBagIcon, 
-  ClipboardDocumentListIcon, 
-  UserGroupIcon, 
-  ArrowLeftOnRectangleIcon,
-  Bars3Icon,
-  XMarkIcon
+  ChartBarIcon, ShoppingBagIcon, ClipboardDocumentListIcon, 
+  UserGroupIcon, ArrowLeftOnRectangleIcon, Bars3Icon, 
+  XMarkIcon, ExclamationTriangleIcon, TagIcon, TruckIcon // 🟢 Added TruckIcon
 } from '@heroicons/vue/24/outline'
 
 const store = useMainStore()
 const router = useRouter()
 const route = useRoute()
+
 const isMobileMenuOpen = ref(false)
+const showLogoutModal = ref(false) 
 
-// --- CRITICAL FIX: Check currentAdmin, not currentUser ---
-if (!store.currentAdmin || store.currentAdmin.role !== 'admin') {
-  router.push('/admin/login')
-}
+// Security Check
+onMounted(() => {
+  if (!store.currentAdmin) {
+    router.push('/admin/login')
+  }
+})
 
-const handleLogout = () => {
-  store.logoutAdmin() // Fix: Log out the admin session
+const confirmLogout = () => { showLogoutModal.value = true }
+const cancelLogout = () => { showLogoutModal.value = false }
+const executeLogout = () => {
+  showLogoutModal.value = false
+  store.logoutAdmin()
   router.push('/admin/login')
 }
 
@@ -47,24 +50,32 @@ const isActive = (path) => route.path.includes(path)
         </button>
       </div>
       
-      <nav class="flex-1 px-4 space-y-2 mt-8">
-        <router-link to="/admin/dashboard" @click="isMobileMenuOpen = false" :class="['flex items-center gap-4 px-6 py-4 rounded-2xl transition-all duration-300 font-medium', isActive('dashboard') ? 'bg-coffee-600 text-white shadow-lg shadow-coffee-900/50' : 'text-gray-400 hover:bg-gray-800 hover:text-white']">
+      <nav class="flex-1 px-4 space-y-2 mt-8 overflow-y-auto">
+        <router-link to="/admin/dashboard" @click="isMobileMenuOpen = false" :class="['flex items-center gap-4 px-6 py-4 rounded-2xl transition-all duration-300 font-medium', isActive('dashboard') ? 'bg-coffee-600 text-white shadow-lg' : 'text-gray-400 hover:bg-gray-800 hover:text-white']">
           <ChartBarIcon class="w-6 h-6" /> Dashboard
         </router-link>
-        <router-link to="/admin/orders" @click="isMobileMenuOpen = false" :class="['flex items-center gap-4 px-6 py-4 rounded-2xl transition-all duration-300 font-medium', isActive('orders') ? 'bg-coffee-600 text-white shadow-lg shadow-coffee-900/50' : 'text-gray-400 hover:bg-gray-800 hover:text-white']">
+        <router-link to="/admin/orders" @click="isMobileMenuOpen = false" :class="['flex items-center gap-4 px-6 py-4 rounded-2xl transition-all duration-300 font-medium', isActive('orders') ? 'bg-coffee-600 text-white shadow-lg' : 'text-gray-400 hover:bg-gray-800 hover:text-white']">
           <ShoppingBagIcon class="w-6 h-6" /> Orders
         </router-link>
-        <router-link to="/admin/products" @click="isMobileMenuOpen = false" :class="['flex items-center gap-4 px-6 py-4 rounded-2xl transition-all duration-300 font-medium', isActive('products') ? 'bg-coffee-600 text-white shadow-lg shadow-coffee-900/50' : 'text-gray-400 hover:bg-gray-800 hover:text-white']">
+        <router-link to="/admin/categories" @click="isMobileMenuOpen = false" :class="['flex items-center gap-4 px-6 py-4 rounded-2xl transition-all duration-300 font-medium', isActive('categories') ? 'bg-coffee-600 text-white shadow-lg' : 'text-gray-400 hover:bg-gray-800 hover:text-white']">
+          <TagIcon class="w-6 h-6" /> Categories
+        </router-link>
+        <router-link to="/admin/products" @click="isMobileMenuOpen = false" :class="['flex items-center gap-4 px-6 py-4 rounded-2xl transition-all duration-300 font-medium', isActive('products') ? 'bg-coffee-600 text-white shadow-lg' : 'text-gray-400 hover:bg-gray-800 hover:text-white']">
           <ClipboardDocumentListIcon class="w-6 h-6" /> Menu
         </router-link>
-        <router-link to="/admin/users" @click="isMobileMenuOpen = false" :class="['flex items-center gap-4 px-6 py-4 rounded-2xl transition-all duration-300 font-medium', isActive('users') ? 'bg-coffee-600 text-white shadow-lg shadow-coffee-900/50' : 'text-gray-400 hover:bg-gray-800 hover:text-white']">
+        
+        <router-link to="/admin/staff" @click="isMobileMenuOpen = false" :class="['flex items-center gap-4 px-6 py-4 rounded-2xl transition-all duration-300 font-medium', isActive('staff') ? 'bg-coffee-600 text-white shadow-lg' : 'text-gray-400 hover:bg-gray-800 hover:text-white']">
+          <TruckIcon class="w-6 h-6" /> Delivery Staff
+        </router-link>
+
+        <router-link to="/admin/users" @click="isMobileMenuOpen = false" :class="['flex items-center gap-4 px-6 py-4 rounded-2xl transition-all duration-300 font-medium', isActive('users') ? 'bg-coffee-600 text-white shadow-lg' : 'text-gray-400 hover:bg-gray-800 hover:text-white']">
           <UserGroupIcon class="w-6 h-6" /> Users
         </router-link>
       </nav>
 
       <div class="p-6 border-t border-gray-800 bg-gray-900/50">
         <div class="flex items-center gap-4 mb-4">
-          <div class="w-10 h-10 rounded-full bg-gradient-to-br from-coffee-400 to-coffee-600 flex items-center justify-center text-sm font-bold shadow-lg">
+          <div class="w-10 h-10 rounded-full bg-gradient-to-br from-coffee-400 to-coffee-600 flex items-center justify-center text-sm font-bold shadow-lg text-white">
             {{ store.currentAdmin?.name?.charAt(0) || 'A' }}
           </div>
           <div>
@@ -72,7 +83,7 @@ const isActive = (path) => route.path.includes(path)
             <p class="text-xs text-gray-500">Super Admin</p>
           </div>
         </div>
-        <button @click="handleLogout" class="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gray-800 text-red-400 hover:bg-red-500 hover:text-white rounded-xl transition-all text-sm font-bold duration-300">
+        <button @click="confirmLogout" class="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gray-800 text-red-400 hover:bg-red-500 hover:text-white rounded-xl transition-all text-sm font-bold duration-300 group">
           <ArrowLeftOnRectangleIcon class="w-5 h-5" /> Sign Out
         </button>
       </div>
@@ -87,21 +98,44 @@ const isActive = (path) => route.path.includes(path)
         <div class="w-10"></div> 
       </header>
 
-      <div class="flex-1 overflow-y-auto p-4 md:p-8 lg:p-10">
+      <div class="flex-1 overflow-y-auto p-4 md:p-8 lg:p-10 relative">
         <div class="max-w-7xl mx-auto">
-          <router-view v-slot="{ Component }">
+          
+          <router-view v-slot="{ Component, route }">
             <transition name="fade" mode="out-in">
-              <component :is="Component" />
+              <div :key="route.path">
+                <component :is="Component" />
+              </div>
             </transition>
           </router-view>
+
         </div>
       </div>
     </main>
+
+    <transition name="modal">
+      <div v-if="showLogoutModal" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-gray-900/60 backdrop-blur-sm transition-opacity" @click="cancelLogout"></div>
+        <div class="relative bg-white rounded-3xl shadow-2xl max-w-sm w-full p-8 transform transition-all scale-100">
+          <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-red-100 mb-6">
+            <ExclamationTriangleIcon class="h-8 w-8 text-red-600" aria-hidden="true" />
+          </div>
+          <h3 class="text-2xl font-extrabold text-center text-gray-900 mb-2">Signing Out?</h3>
+          <p class="text-center text-gray-500 text-sm mb-8">Are you sure you want to end your session?</p>
+          <div class="flex gap-3">
+            <button @click="cancelLogout" class="flex-1 px-4 py-3 bg-gray-100 text-gray-700 font-bold rounded-xl hover:bg-gray-200">Cancel</button>
+            <button @click="executeLogout" class="flex-1 px-4 py-3 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 shadow-lg">Sign Out</button>
+          </div>
+        </div>
+      </div>
+    </transition>
+
   </div>
 </template>
 
 <style scoped>
+/* Ensure smooth fade transitions */
 .fade-enter-active, .fade-leave-active { transition: opacity 0.2s ease, transform 0.2s ease; }
-.fade-enter-from { opacity: 0; transform: translateY(10px); }
-.fade-leave-to { opacity: 0; transform: translateY(-10px); }
+.fade-enter-from { opacity: 0; transform: translateY(5px); }
+.fade-leave-to { opacity: 0; transform: translateY(-5px); }
 </style>

@@ -1,18 +1,11 @@
 <script setup>
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useMainStore } from '@/stores/mainStore'
 import { 
-  PlusIcon, 
-  PencilSquareIcon, 
-  TrashIcon, 
-  XMarkIcon, 
-  Squares2X2Icon, 
-  ListBulletIcon,
-  MagnifyingGlassIcon,
-  PhotoIcon,
-  ExclamationTriangleIcon,
-  CurrencyDollarIcon,
-  TagIcon
+  PlusIcon, PencilSquareIcon, TrashIcon, XMarkIcon, 
+  Squares2X2Icon, ListBulletIcon, MagnifyingGlassIcon, 
+  PhotoIcon, ExclamationTriangleIcon, CubeIcon, ArchiveBoxIcon,
+  PowerIcon // 🟢 Imported PowerIcon for the modal
 } from '@heroicons/vue/24/outline'
 
 const store = useMainStore()
@@ -20,296 +13,336 @@ const store = useMainStore()
 // State
 const showModal = ref(false)
 const showDeleteModal = ref(false)
+const showStatusModal = ref(false) // 🟢 NEW: State for Status Modal
 const productToDelete = ref(null)
+const productToToggle = ref(null) // 🟢 NEW: Track which product to toggle
 const isEditing = ref(false)
-const viewMode = ref('grid') // 'grid' or 'list'
+const viewMode = ref('grid') 
 const searchQuery = ref('')
-const categories = ['Coffee', 'Tea', 'Snacks', 'Desserts']
+const selectedGroup = ref('All')
+const selectedCategory = ref('All')
+const selectedSubFilter = ref('All') 
+const isScrollActive = ref(false)
+
+// File State
+const fileInput = ref(null)
+const selectedFile = ref(null)
+const imagePreview = ref(null)
+
+onMounted(async () => {
+  await store.fetchProducts()
+  await store.fetchCategories() 
+  window.addEventListener('scroll', () => { isScrollActive.value = window.scrollY > 20 })
+})
 
 // Form Data
 const form = reactive({ 
-  id: null, 
-  name: '', 
-  category: 'Coffee', 
-  price: '', 
-  image: '', 
-  desc: '' 
+  id: null, name: '', category: '', subcategory: '', price: '', desc: '' 
 })
 
-// Computed
+// --- COMPUTED ---
+const distinctGroups = computed(() => ['All', ...new Set(store.categories.map(c => c.group))])
+
+const filteredCategories = computed(() => {
+  if (selectedGroup.value === 'All') return store.categories
+  return store.categories.filter(c => c.group === selectedGroup.value)
+})
+
+const filterSubcategories = computed(() => {
+  if (selectedCategory.value === 'All') return []
+  const cat = store.categories.find(c => c.name === selectedCategory.value)
+  return cat && cat.subcategories ? ['All', ...cat.subcategories] : []
+})
+
 const filteredProducts = computed(() => {
-  if (!searchQuery.value) return store.products
-  const query = searchQuery.value.toLowerCase()
-  return store.products.filter(p => 
-    p.name.toLowerCase().includes(query) || 
-    p.category.toLowerCase().includes(query)
-  )
+  return store.products.filter(p => {
+    const matchesSearch = p.name.toLowerCase().includes(searchQuery.value.toLowerCase())
+    if (!matchesSearch) return false
+    
+    if (selectedGroup.value !== 'All') {
+      const catObj = store.categories.find(c => c.name === p.category)
+      if (!catObj || catObj.group !== selectedGroup.value) return false
+    }
+    
+    if (selectedCategory.value !== 'All' && p.category !== selectedCategory.value) return false
+    if (selectedSubFilter.value !== 'All' && p.subcategory !== selectedSubFilter.value) return false
+
+    return true
+  })
+})
+
+const availableSubcategories = computed(() => {
+  const cat = store.categories.find(c => c.name === form.category)
+  return cat ? (cat.subcategories || []) : []
+})
+
+watch(selectedGroup, () => { selectedCategory.value = 'All'; selectedSubFilter.value = 'All' })
+watch(selectedCategory, () => { selectedSubFilter.value = 'All' })
+
+watch(() => form.category, () => {
+  const cat = store.categories.find(c => c.name === form.category)
+  const subs = cat ? (cat.subcategories || []) : []
+  if (!subs.includes(form.subcategory)) { form.subcategory = '' }
 })
 
 // --- ACTIONS ---
-
 const openAdd = () => {
   isEditing.value = false
-  // Reset Form
-  Object.assign(form, { id: Date.now(), name: '', category: 'Coffee', price: '', image: '', desc: '' })
-  showModal.value = true
+  Object.assign(form, { id: null, name: '', category: '', subcategory: '', price: '', desc: '' })
+  selectedFile.value = null; imagePreview.value = null; showModal.value = true
 }
 
 const openEdit = (p) => {
   isEditing.value = true
-  // Clone data to form
-  Object.assign(form, p)
-  showModal.value = true
+  Object.assign(form, { ...p, subcategory: p.subcategory || '' })
+  imagePreview.value = p.image || null; selectedFile.value = null; showModal.value = true
 }
 
-const handleSave = () => {
-  // Basic Validation
-  if (!form.name || !form.price) {
-    store.showToast('Please fill in Name and Price.', 'error')
-    return
-  }
+const triggerFileInput = () => fileInput.value.click()
+const handleFileChange = (e) => { const f = e.target.files[0]; if(f) { selectedFile.value = f; imagePreview.value = URL.createObjectURL(f) } }
 
-  const payload = { ...form, price: parseFloat(form.price) }
-
-  if (isEditing.value) {
-    // Update existing (Find index logic handles inside component for simplicity or store)
-    // Ideally store should have updateProduct action, but we can do it here manually for local array
-    const idx = store.products.findIndex(p => p.id === payload.id)
-    if (idx !== -1) {
-      store.products[idx] = payload
-      store.saveToStorage() // Ensure persistence
-      store.showToast('Product updated successfully!', 'success')
-    }
-  } else {
-    // Add New
-    store.addProduct(payload)
-    store.showToast('New product created!', 'success')
-  }
-  
-  showModal.value = false
+const handleSave = async () => {
+  if (!form.name || !form.price || !form.category) { store.showToast('Please fill required fields.', 'error'); return }
+  const fd = new FormData(); fd.append('name', form.name); fd.append('category', form.category); fd.append('subcategory', form.subcategory); fd.append('price', form.price); fd.append('desc', form.desc);
+  if (selectedFile.value) fd.append('image', selectedFile.value)
+  const success = isEditing.value ? await store.updateProduct(form.id, fd) : await store.addProduct(fd)
+  if (success) showModal.value = false
 }
 
-// Custom Delete Logic
-const promptDelete = (id) => {
-  productToDelete.value = id
-  showDeleteModal.value = true
-}
-
-const confirmDelete = () => {
-  if (productToDelete.value) {
-    store.deleteProduct(productToDelete.value)
-    store.showToast('Product deleted.', 'info')
-    showDeleteModal.value = false
-    productToDelete.value = null
-  }
-}
-
+const promptDelete = (id) => { productToDelete.value = id; showDeleteModal.value = true }
+const confirmDelete = async () => { if(productToDelete.value) { await store.deleteProduct(productToDelete.value); showDeleteModal.value = false; productToDelete.value = null } }
 const formatCurrency = (val) => `$${parseFloat(val).toFixed(2)}`
+
+// 🟢 NEW: PROMPT STATUS CHANGE
+const promptToggleStatus = (product) => {
+  productToToggle.value = product
+  showStatusModal.value = true
+}
+
+// 🟢 NEW: EXECUTE STATUS CHANGE
+const confirmToggleStatus = async () => {
+  if (productToToggle.value) {
+    await store.toggleProductActive(productToToggle.value.id, !productToToggle.value.isActive)
+    showStatusModal.value = false
+    productToToggle.value = null
+  }
+}
 </script>
 
 <template>
-  <div class="space-y-8 animate-fade-in pb-20">
+  <div class="min-h-screen bg-[#F8FAFC] pb-32 font-sans selection:bg-gray-900 selection:text-white">
     
-    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
-      <div>
-        <h2 class="text-3xl font-extrabold text-gray-900 tracking-tight">Menu Manager</h2>
-        <p class="text-gray-500 text-sm mt-1">Manage your product catalog.</p>
-      </div>
-
-      <div class="flex flex-wrap items-center gap-3 w-full md:w-auto">
-        <div class="relative flex-grow md:flex-grow-0 md:w-64">
-          <MagnifyingGlassIcon class="w-5 h-5 text-gray-400 absolute left-3 top-3" />
-          <input 
-            v-model="searchQuery" 
-            type="text" 
-            placeholder="Search items..." 
-            class="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-transparent focus:bg-white focus:border-coffee-500 focus:ring-4 focus:ring-coffee-500/10 rounded-2xl outline-none text-sm transition-all"
-          >
+    <div class="relative bg-gray-900 pt-10 pb-20 px-6 overflow-hidden">
+      <div class="absolute inset-0 opacity-20 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"></div>
+      <div class="absolute inset-0 bg-gradient-to-b from-transparent to-[#F8FAFC]"></div>
+      
+      <div class="relative z-10 max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
+        <div>
+          <div class="flex items-center gap-2 text-indigo-300 mb-2 text-xs font-bold tracking-widest uppercase">
+            <CubeIcon class="w-4 h-4" /> Management
+          </div>
+          <h1 class="text-3xl md:text-5xl font-black text-white tracking-tight leading-tight">
+            Product <span class="text-transparent bg-clip-text bg-gradient-to-r from-indigo-300 to-white">Hub</span>
+          </h1>
         </div>
-
-        <div class="flex bg-gray-100 p-1 rounded-xl">
-          <button @click="viewMode = 'grid'" :class="['p-2 rounded-lg transition-all', viewMode === 'grid' ? 'bg-white shadow text-coffee-600' : 'text-gray-400 hover:text-gray-600']">
-            <Squares2X2Icon class="w-5 h-5" />
-          </button>
-          <button @click="viewMode = 'list'" :class="['p-2 rounded-lg transition-all', viewMode === 'list' ? 'bg-white shadow text-coffee-600' : 'text-gray-400 hover:text-gray-600']">
-            <ListBulletIcon class="w-5 h-5" />
-          </button>
-        </div>
-
-        <button 
-          @click="openAdd" 
-          class="hidden md:flex items-center gap-2 bg-coffee-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-coffee-700 transition shadow-lg shadow-coffee-200 active:scale-95"
-        >
-          <PlusIcon class="w-5 h-5" /> Add Item
+        <button @click="openAdd" class="bg-white text-gray-900 px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-indigo-50 transition shadow-[0_10px_20px_rgba(255,255,255,0.1)] flex items-center gap-2 transform hover:-translate-y-1 active:scale-95">
+          <PlusIcon class="w-5 h-5" /> Add New
         </button>
       </div>
     </div>
 
-    <div v-if="filteredProducts.length === 0" class="text-center py-24 bg-white rounded-3xl border border-dashed border-gray-300">
-      <div class="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4 text-gray-300">
-        <MagnifyingGlassIcon class="w-10 h-10" />
-      </div>
-      <h3 class="text-xl font-bold text-gray-900">No items found</h3>
-      <p class="text-gray-500 mt-1">Try adjusting your search or add a new item.</p>
-    </div>
-
-    <div v-else-if="viewMode === 'grid'" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-      <div 
-        v-for="product in filteredProducts" 
-        :key="product.id" 
-        class="group bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-xl transition-all duration-300 flex flex-col"
-      >
-        <div class="h-56 overflow-hidden relative bg-gray-100">
-          <img 
-            :src="product.image" 
-            class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
-            @error="$event.target.src='https://via.placeholder.com/300?text=No+Image'" 
-          >
-          
-          <div class="absolute top-4 right-4 bg-white/90 backdrop-blur px-3 py-1 rounded-lg text-xs font-bold shadow-sm uppercase tracking-wide text-coffee-700">
-            {{ product.category }}
+    <div :class="['sticky top-0 z-30 transition-all duration-300 -mt-10 px-4 md:px-8', isScrollActive ? 'py-3' : '']">
+      <div :class="['max-w-7xl mx-auto bg-white/90 backdrop-blur-xl rounded-[1.5rem] border border-white/20 p-4 shadow-xl transition-all duration-300', isScrollActive ? 'shadow-lg border-gray-200/50' : 'shadow-2xl']">
+        
+        <div class="flex flex-col gap-3">
+          <div class="flex flex-row gap-3 items-center">
+            <div class="relative flex-1 group">
+              <MagnifyingGlassIcon class="w-5 h-5 text-gray-400 absolute left-3 top-2.5 transition group-focus-within:text-indigo-600" />
+              <input v-model="searchQuery" type="text" placeholder="Search..." class="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500 transition text-sm font-medium shadow-inner">
+            </div>
+            
+            <div class="flex bg-gray-100 p-1 rounded-xl shrink-0">
+              <button @click="viewMode = 'grid'" :class="['p-1.5 rounded-lg transition-all', viewMode === 'grid' ? 'bg-white shadow text-indigo-600' : 'text-gray-400']"><Squares2X2Icon class="w-5 h-5" /></button>
+              <button @click="viewMode = 'list'" :class="['p-1.5 rounded-lg transition-all', viewMode === 'list' ? 'bg-white shadow text-indigo-600' : 'text-gray-400']"><ListBulletIcon class="w-5 h-5" /></button>
+            </div>
           </div>
-        </div>
 
-        <div class="p-6 flex-1 flex flex-col">
-          <div class="flex justify-between items-start mb-2">
-            <h3 class="font-bold text-gray-900 text-lg leading-tight line-clamp-1" :title="product.name">{{ product.name }}</h3>
-            <span class="text-coffee-600 font-extrabold text-lg">{{ formatCurrency(product.price) }}</span>
-          </div>
-          <p class="text-sm text-gray-500 mb-6 line-clamp-2 h-10">{{ product.desc }}</p>
-          
-          <div class="mt-auto flex gap-2 pt-4 border-t border-gray-50">
-            <button 
-              @click="openEdit(product)" 
-              class="flex-1 bg-gray-50 text-gray-600 py-2.5 rounded-xl text-sm font-bold hover:bg-coffee-50 hover:text-coffee-600 transition flex items-center justify-center gap-2"
-            >
-              <PencilSquareIcon class="w-4 h-4" /> Edit
-            </button>
-            <button 
-              @click="promptDelete(product.id)" 
-              class="px-4 bg-white border border-gray-200 text-red-400 rounded-xl hover:bg-red-50 hover:border-red-100 hover:text-red-500 transition"
-            >
-              <TrashIcon class="w-5 h-5" />
-            </button>
+          <div class="flex flex-col gap-3 pt-2 border-t border-gray-100">
+            <div class="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+              <button v-for="grp in distinctGroups" :key="grp" @click="selectedGroup = grp" 
+                :class="['px-3 py-1.5 rounded-lg text-xs font-bold transition whitespace-nowrap', selectedGroup === grp ? 'bg-gray-900 text-white shadow-md' : 'bg-gray-50 text-gray-600 hover:bg-gray-100']">
+                {{ grp }}
+              </button>
+            </div>
+            
+            <div v-if="filteredCategories.length > 0" class="flex gap-2 overflow-x-auto no-scrollbar pb-1 items-center">
+              <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mr-1 shrink-0">Cat:</span>
+              <button @click="selectedCategory = 'All'" :class="['px-3 py-1.5 rounded-lg text-xs font-bold border transition whitespace-nowrap shrink-0', selectedCategory === 'All' ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-white border-gray-200 text-gray-500 hover:border-gray-400']">All</button>
+              <button v-for="cat in filteredCategories" :key="cat.id" @click="selectedCategory = cat.name" 
+                :class="['px-3 py-1.5 rounded-lg text-xs font-bold border transition whitespace-nowrap flex items-center gap-1 shrink-0', selectedCategory === cat.name ? 'bg-white border-indigo-600 ring-1 ring-indigo-600 text-indigo-700' : 'bg-white border-gray-200 text-gray-500 hover:border-gray-400']">
+                <div class="w-3 h-3 rounded-full bg-gray-100 overflow-hidden"><img :src="cat.image" class="w-full h-full object-cover"></div>
+                {{ cat.name }}
+              </button>
+            </div>
+
+            <div v-if="filterSubcategories.length > 1" class="flex gap-2 overflow-x-auto no-scrollbar pb-1 items-center animate-fade-in-down">
+              <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mr-1 shrink-0">Sub:</span>
+              <button v-for="sub in filterSubcategories" :key="sub" @click="selectedSubFilter = sub"
+                :class="['px-3 py-1 rounded-md text-[10px] font-bold border transition whitespace-nowrap shrink-0', selectedSubFilter === sub ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50']">
+                {{ sub }}
+              </button>
+            </div>
           </div>
         </div>
       </div>
     </div>
 
-    <div v-else class="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
-      <div class="overflow-x-auto">
-        <table class="w-full text-left border-collapse">
-          <thead class="bg-gray-50/50 border-b border-gray-100 text-xs uppercase text-gray-400 font-bold tracking-wider">
-            <tr>
-              <th class="px-6 py-4">Product</th>
-              <th class="px-6 py-4">Category</th>
-              <th class="px-6 py-4">Description</th>
-              <th class="px-6 py-4">Price</th>
-              <th class="px-6 py-4 text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-gray-50">
-            <tr v-for="product in filteredProducts" :key="product.id" class="hover:bg-gray-50/50 transition-colors group">
-              <td class="px-6 py-4">
-                <div class="flex items-center gap-4">
-                  <img :src="product.image" class="w-12 h-12 rounded-xl object-cover bg-gray-100 border border-gray-100">
-                  <span class="font-bold text-gray-900">{{ product.name }}</span>
-                </div>
-              </td>
-              <td class="px-6 py-4">
-                <span class="px-3 py-1 rounded-lg bg-gray-100 text-gray-600 text-xs font-bold uppercase tracking-wide">
-                  {{ product.category }}
-                </span>
-              </td>
-              <td class="px-6 py-4 max-w-xs">
-                <p class="text-sm text-gray-500 truncate">{{ product.desc }}</p>
-              </td>
-              <td class="px-6 py-4">
-                <span class="font-bold text-gray-900">{{ formatCurrency(product.price) }}</span>
-              </td>
-              <td class="px-6 py-4 text-right">
-                <div class="flex justify-end gap-2">
-                  <button @click="openEdit(product)" class="p-2 text-gray-400 hover:text-coffee-600 hover:bg-coffee-50 rounded-lg transition">
-                    <PencilSquareIcon class="w-5 h-5" />
-                  </button>
-                  <button @click="promptDelete(product.id)" class="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition">
-                    <TrashIcon class="w-5 h-5" />
-                  </button>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+    <div class="max-w-7xl mx-auto px-4 md:px-8 mt-6">
+      
+      <div v-if="filteredProducts.length === 0" class="flex flex-col items-center justify-center py-20 bg-white rounded-[2rem] border-2 border-dashed border-gray-200 shadow-sm">
+        <div class="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mb-4"><ArchiveBoxIcon class="w-8 h-8 text-gray-300" /></div>
+        <h3 class="text-lg font-bold text-gray-900">No products found</h3>
+        <p class="text-gray-500 mt-1 text-xs">Try adjusting your search or filters.</p>
+        <button @click="openAdd" class="mt-4 text-indigo-600 font-bold hover:underline text-sm">Add New Item</button>
       </div>
-    </div>
 
-    <button 
-      @click="openAdd" 
-      class="md:hidden fixed bottom-6 right-6 w-14 h-14 bg-coffee-600 text-white rounded-full shadow-2xl flex items-center justify-center z-40 active:scale-90 transition-transform"
-    >
-      <PlusIcon class="w-8 h-8" />
-    </button>
+      <div v-else-if="viewMode === 'grid'" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6 animate-fade-in">
+        <div v-for="product in filteredProducts" :key="product.id" class="group bg-white rounded-2xl md:rounded-[2rem] border border-gray-100 overflow-hidden hover:shadow-xl transition-all duration-300 hover:-translate-y-1 flex flex-col relative shadow-sm">
+          
+          <div class="h-40 md:h-48 overflow-hidden relative bg-gray-50">
+            <img :src="product.image" :class="['w-full h-full object-cover transition duration-700 group-hover:scale-110', !product.isActive ? 'grayscale opacity-70' : '']" @error="$event.target.src='https://via.placeholder.com/300'">
+            
+            <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+            
+            <div class="absolute top-2 left-2 bg-white/90 backdrop-blur-md px-2 py-0.5 rounded-lg text-[10px] font-bold uppercase tracking-wide text-gray-800 border border-white/50 shadow-sm">
+              {{ product.category }}
+            </div>
+
+            <div v-if="!product.isActive" class="absolute top-2 right-2 bg-red-500/90 backdrop-blur-md px-2 py-0.5 rounded-lg text-[10px] font-bold uppercase tracking-wide text-white shadow-sm border border-red-400">
+              Inactive
+            </div>
+            
+            <div class="absolute bottom-2 right-2 flex gap-1.5 opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all duration-300">
+              <button @click="openEdit(product)" class="w-8 h-8 bg-white rounded-full flex items-center justify-center text-gray-700 hover:text-indigo-600 shadow-md transition"><PencilSquareIcon class="w-4 h-4" /></button>
+              <button @click="promptDelete(product.id)" class="w-8 h-8 bg-white rounded-full flex items-center justify-center text-gray-700 hover:text-red-500 shadow-md transition"><TrashIcon class="w-4 h-4" /></button>
+            </div>
+          </div>
+
+          <div class="p-3 md:p-5 flex-1 flex flex-col">
+            <div class="mb-1">
+              <h3 class="font-bold text-gray-900 text-sm md:text-base leading-tight line-clamp-1 group-hover:text-indigo-600 transition-colors">{{ product.name }}</h3>
+            </div>
+            <p class="text-[10px] md:text-xs text-gray-500 mb-3 line-clamp-2 leading-relaxed">{{ product.desc }}</p>
+            
+            <div class="mt-auto flex items-center justify-between pt-3 border-t border-dashed border-gray-100">
+              <span class="text-base md:text-lg font-black text-gray-900 tracking-tight">{{ formatCurrency(product.price) }}</span>
+              
+              <button 
+                @click.stop="promptToggleStatus(product)" 
+                :class="['w-9 h-5 rounded-full relative transition-colors duration-300 focus:outline-none', product.isActive ? 'bg-green-500' : 'bg-gray-300']"
+                title="Toggle Active Status"
+              >
+                <div :class="['w-3.5 h-3.5 bg-white rounded-full absolute top-0.5 shadow-sm transition-transform duration-300', product.isActive ? 'left-[20px]' : 'left-[2px]']"></div>
+              </button>
+
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div v-else class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden animate-fade-in">
+        <div v-for="product in filteredProducts" :key="product.id" class="flex items-center gap-3 md:gap-5 p-3 md:p-5 border-b border-gray-50 last:border-0 hover:bg-gray-50 transition group">
+          
+          <div class="w-16 h-16 md:w-20 md:h-20 rounded-xl bg-gray-100 overflow-hidden shrink-0 border border-gray-200 shadow-sm relative">
+            <img :src="product.image" :class="['w-full h-full object-cover', !product.isActive ? 'grayscale opacity-60' : '']">
+            <div v-if="!product.isActive" class="absolute inset-0 flex items-center justify-center bg-black/10">
+               <span class="text-[8px] font-black bg-red-500 text-white px-1 rounded">OFF</span>
+            </div>
+          </div>
+
+          <div class="flex-1 min-w-0">
+            <h3 class="font-bold text-gray-900 text-sm md:text-base truncate">{{ product.name }}</h3>
+            <div class="flex items-center gap-2 mt-0.5">
+              <span class="text-[10px] font-bold text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">{{ product.category }}</span>
+              <span v-if="product.subcategory" class="text-[10px] text-gray-400">• {{ product.subcategory }}</span>
+            </div>
+            <p class="text-xs text-gray-400 mt-1 truncate max-w-xs">{{ product.desc }}</p>
+          </div>
+
+          <div class="flex flex-col items-end gap-2">
+             <div class="font-black text-gray-900 text-sm md:text-lg">{{ formatCurrency(product.price) }}</div>
+             <button 
+                @click.stop="promptToggleStatus(product)" 
+                :class="['w-8 h-4 rounded-full relative transition-colors duration-300', product.isActive ? 'bg-green-500' : 'bg-gray-300']"
+              >
+                <div :class="['w-3 h-3 bg-white rounded-full absolute top-0.5 shadow-sm transition-transform duration-300', product.isActive ? 'left-[18px]' : 'left-[2px]']"></div>
+              </button>
+          </div>
+
+          <div class="flex gap-1 md:gap-2 pl-2 md:pl-4 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+            <button @click="openEdit(product)" class="p-2 bg-white border border-gray-200 rounded-lg hover:bg-indigo-50 text-gray-500 hover:text-indigo-600 shadow-sm"><PencilSquareIcon class="w-4 h-4" /></button>
+            <button @click="promptDelete(product.id)" class="p-2 bg-white border border-gray-200 rounded-lg hover:bg-red-50 text-gray-500 hover:text-red-500 shadow-sm"><TrashIcon class="w-4 h-4" /></button>
+          </div>
+        </div>
+      </div>
+
+    </div>
 
     <transition name="modal">
       <div v-if="showModal" class="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div class="absolute inset-0 bg-gray-900/60 backdrop-blur-sm transition-opacity" @click="showModal = false"></div>
-        
-        <div class="bg-white w-full max-w-lg rounded-3xl shadow-2xl relative z-10 p-8 transform transition-all scale-100">
-          <div class="flex justify-between items-center mb-8">
+        <div class="absolute inset-0 bg-gray-900/60 backdrop-blur-md transition-opacity" @click="showModal = false"></div>
+        <div class="bg-white w-full max-w-lg rounded-[2rem] shadow-2xl relative z-10 p-6 md:p-8 transform transition-all scale-100 overflow-y-auto max-h-[90vh] animate-zoom-in">
+          
+          <div class="flex justify-between items-start mb-6">
             <div>
-              <h3 class="text-2xl font-extrabold text-gray-900">{{ isEditing ? 'Edit Item' : 'New Item' }}</h3>
-              <p class="text-gray-500 text-sm">Fill in the details below.</p>
+              <h3 class="text-2xl font-black text-gray-900 tracking-tight">{{ isEditing ? 'Edit Item' : 'New Item' }}</h3>
+              <p class="text-gray-500 text-sm mt-0.5">Product details</p>
             </div>
-            <button @click="showModal = false" class="p-2 hover:bg-gray-100 rounded-full transition text-gray-400 hover:text-gray-600">
-              <XMarkIcon class="w-6 h-6" />
-            </button>
+            <button @click="showModal = false" class="p-2 bg-gray-50 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-900 transition"><XMarkIcon class="w-5 h-5" /></button>
           </div>
           
           <form @submit.prevent="handleSave" class="space-y-5">
-            <div>
-              <label class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 flex items-center gap-1">
-                <TagIcon class="w-3 h-3" /> Product Name
-              </label>
-              <input v-model="form.name" type="text" required class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:bg-white focus:border-coffee-500 focus:ring-4 focus:ring-coffee-500/10 transition font-medium">
+            <div class="group relative w-full h-40 rounded-2xl bg-gray-50 border-2 border-dashed border-gray-300 flex flex-col items-center justify-center overflow-hidden cursor-pointer hover:border-indigo-500 transition-all" @click="triggerFileInput">
+              <img v-if="imagePreview" :src="imagePreview" class="w-full h-full object-cover">
+              <div v-else class="text-gray-400 flex flex-col items-center">
+                <PhotoIcon class="w-8 h-8 mb-2" />
+                <span class="text-xs font-bold uppercase tracking-wide">Upload Image</span>
+              </div>
+              <input type="file" ref="fileInput" class="hidden" @change="handleFileChange" accept="image/*">
             </div>
+
+            <div><label class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 block">Name</label><input v-model="form.name" type="text" required class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500 transition text-sm font-bold"></div>
             
-            <div class="grid grid-cols-2 gap-5">
+            <div class="grid grid-cols-2 gap-4">
               <div>
-                <label class="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">Category</label>
+                <label class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 block">Category</label>
                 <div class="relative">
-                  <select v-model="form.category" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:bg-white focus:border-coffee-500 focus:ring-4 focus:ring-coffee-500/10 transition font-medium appearance-none cursor-pointer">
-                    <option v-for="c in categories" :key="c">{{ c }}</option>
+                  <select v-model="form.category" required class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500 transition text-sm font-bold appearance-none">
+                    <option disabled value="">Select</option>
+                    <option v-for="cat in store.categories" :key="cat.id" :value="cat.name">{{ cat.name }}</option>
                   </select>
-                  <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-500">
-                    <svg class="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
-                  </div>
+                  <div class="absolute right-3 top-3.5 pointer-events-none text-gray-400 text-[10px]">▼</div>
                 </div>
               </div>
-              <div>
-                <label class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 flex items-center gap-1">
-                  <CurrencyDollarIcon class="w-3 h-3" /> Price
-                </label>
-                <input v-model="form.price" type="number" step="0.01" required class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:bg-white focus:border-coffee-500 focus:ring-4 focus:ring-coffee-500/10 transition font-medium">
+              <div><label class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 block">Price</label><input v-model="form.price" type="number" step="0.01" required class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500 transition text-sm font-bold"></div>
+            </div>
+
+            <div v-if="availableSubcategories.length > 0">
+              <label class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 block">Subcategory</label>
+              <div class="relative">
+                <select v-model="form.subcategory" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500 transition text-sm font-bold appearance-none">
+                  <option value="">None</option>
+                  <option v-for="sub in availableSubcategories" :key="sub" :value="sub">{{ sub }}</option>
+                </select>
+                <div class="absolute right-3 top-3.5 pointer-events-none text-gray-400 text-[10px]">▼</div>
               </div>
             </div>
 
-            <div>
-              <label class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 flex items-center gap-1">
-                <PhotoIcon class="w-3 h-3" /> Image URL
-              </label>
-              <input v-model="form.image" type="text" required class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:bg-white focus:border-coffee-500 focus:ring-4 focus:ring-coffee-500/10 transition font-medium text-sm">
-            </div>
+            <div><label class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 block">Description</label><textarea v-model="form.desc" rows="3" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500 transition text-sm font-medium resize-none"></textarea></div>
 
-            <div>
-              <label class="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">Description</label>
-              <textarea v-model="form.desc" rows="3" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:bg-white focus:border-coffee-500 focus:ring-4 focus:ring-coffee-500/10 transition font-medium resize-none text-sm"></textarea>
-            </div>
-
-            <div class="pt-4 border-t border-gray-100 flex justify-end gap-3">
-              <button type="button" @click="showModal = false" class="px-6 py-3 rounded-xl font-bold text-gray-500 hover:bg-gray-100 transition">Cancel</button>
-              <button class="px-8 py-3 bg-gray-900 text-white rounded-xl font-bold hover:bg-coffee-600 transition shadow-lg shadow-gray-200 active:scale-95">
-                {{ isEditing ? 'Save Changes' : 'Create Item' }}
-              </button>
+            <div class="pt-4 border-t border-dashed border-gray-200 flex justify-end gap-3">
+              <button type="button" @click="showModal = false" class="px-6 py-3 rounded-xl font-bold text-gray-500 hover:bg-gray-100 transition text-sm">Cancel</button>
+              <button class="px-8 py-3 bg-gray-900 text-white rounded-xl font-bold hover:bg-indigo-600 transition shadow-lg active:scale-95 text-sm">{{ isEditing ? 'Save' : 'Create' }}</button>
             </div>
           </form>
         </div>
@@ -319,29 +352,44 @@ const formatCurrency = (val) => `$${parseFloat(val).toFixed(2)}`
     <transition name="modal">
       <div v-if="showDeleteModal" class="fixed inset-0 z-50 flex items-center justify-center p-4">
         <div class="absolute inset-0 bg-gray-900/60 backdrop-blur-sm transition-opacity" @click="showDeleteModal = false"></div>
-        
-        <div class="bg-white w-full max-w-sm rounded-3xl shadow-2xl relative z-10 p-6 transform transition-all scale-100">
-          <div class="w-14 h-14 bg-red-100 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
-            <ExclamationTriangleIcon class="w-8 h-8" />
+        <div class="bg-white w-full max-w-sm rounded-[2rem] shadow-2xl relative z-10 p-8 text-center transform transition-all scale-100 animate-pop-in">
+          <div class="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4"><ExclamationTriangleIcon class="w-8 h-8" /></div>
+          <h3 class="text-xl font-black text-gray-900 mb-2">Delete Product?</h3>
+          <div class="grid grid-cols-2 gap-4 mt-6">
+            <button @click="showDeleteModal = false" class="py-3 rounded-xl font-bold bg-gray-50 text-gray-600 hover:bg-gray-100 transition">Cancel</button>
+            <button @click="confirmDelete" class="py-3 rounded-xl font-bold bg-red-600 text-white hover:bg-red-700 shadow-lg transition">Delete</button>
+          </div>
+        </div>
+      </div>
+    </transition>
+
+    <transition name="modal">
+      <div v-if="showStatusModal" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-gray-900/60 backdrop-blur-sm transition-opacity" @click="showStatusModal = false"></div>
+        <div class="bg-white w-full max-w-sm rounded-[2rem] shadow-2xl relative z-10 p-8 text-center transform transition-all scale-100 animate-pop-in">
+          
+          <div :class="['w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4', productToToggle?.isActive ? 'bg-orange-50 text-orange-500' : 'bg-green-50 text-green-500']">
+            <PowerIcon class="w-8 h-8" />
           </div>
           
-          <h3 class="text-xl font-extrabold text-center text-gray-900 mb-2">Delete this product?</h3>
-          <p class="text-center text-gray-500 text-sm mb-8">
-            This action is permanent. The item will be removed from the menu immediately.
-          </p>
+          <h3 class="text-xl font-black text-gray-900 mb-2">
+            {{ productToToggle?.isActive ? 'Deactivate Product?' : 'Activate Product?' }}
+          </h3>
           
-          <div class="grid grid-cols-2 gap-3">
+          <p class="text-sm text-gray-500 mb-4">
+            Are you sure you want to {{ productToToggle?.isActive ? 'hide' : 'show' }} 
+            <span class="font-bold text-gray-800">"{{ productToToggle?.name }}"</span> 
+            from the menu?
+          </p>
+
+          <div class="grid grid-cols-2 gap-4 mt-6">
+            <button @click="showStatusModal = false" class="py-3 rounded-xl font-bold bg-gray-50 text-gray-600 hover:bg-gray-100 transition">Cancel</button>
+            
             <button 
-              @click="showDeleteModal = false" 
-              class="py-3 px-4 bg-gray-100 text-gray-700 font-bold rounded-xl hover:bg-gray-200 transition"
+              @click="confirmToggleStatus" 
+              :class="['py-3 rounded-xl font-bold text-white shadow-lg transition', productToToggle?.isActive ? 'bg-orange-500 hover:bg-orange-600' : 'bg-green-600 hover:bg-green-700']"
             >
-              Cancel
-            </button>
-            <button 
-              @click="confirmDelete" 
-              class="py-3 px-4 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 shadow-lg shadow-red-200 transition transform active:scale-95"
-            >
-              Yes, Delete
+              {{ productToToggle?.isActive ? 'Deactivate' : 'Activate' }}
             </button>
           </div>
         </div>
@@ -352,8 +400,17 @@ const formatCurrency = (val) => `$${parseFloat(val).toFixed(2)}`
 </template>
 
 <style scoped>
-.modal-enter-active, .modal-leave-active { transition: opacity 0.2s ease; }
+.modal-enter-active, .modal-leave-active { transition: opacity 0.3s ease; }
 .modal-enter-from, .modal-leave-to { opacity: 0; }
-.modal-enter-active .transform, .modal-leave-active .transform { transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); }
-.modal-enter-from .transform { transform: scale(0.95) translateY(10px); opacity: 0; }
+
+.animate-zoom-in { animation: zoomIn 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+@keyframes zoomIn { from { opacity: 0; transform: scale(0.95) translateY(10px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+
+.animate-pop-in { animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+@keyframes popIn { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+.animate-fade-in-down { animation: fadeInDown 0.4s ease-out forwards; }
+@keyframes fadeInDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+
+.no-scrollbar::-webkit-scrollbar { display: none; }
 </style>

@@ -1,5 +1,7 @@
 <script setup>
 import { ref } from 'vue'
+import axios from 'axios' 
+import { useMainStore } from '@/stores/mainStore' // 🟢 1. Import your store
 import { 
   PhoneIcon, 
   EnvelopeIcon, 
@@ -8,6 +10,8 @@ import {
   PaperAirplaneIcon 
 } from '@heroicons/vue/24/outline'
 
+const store = useMainStore() // 🟢 2. Initialize the store
+
 // Form State
 const form = ref({
   name: '',
@@ -15,49 +19,42 @@ const form = ref({
   message: ''
 })
 const isSending = ref(false)
-const showSuccess = ref(false)
+// 🔴 Removed showSuccess since we use Toasts now
 
 // FAQ Data
 const faqs = ref([
-  { 
-    q: "Do you offer Vegan options?", 
-    a: "Yes! We have Almond, Oat, and Soy milk available for all our coffee and tea drinks.", 
-    open: false 
-  },
-  { 
-    q: "Can I book a table for a meeting?", 
-    a: "We operate on a first-come, first-served basis. However, for groups larger than 6, please give us a call to reserve the community table.", 
-    open: false 
-  },
-  { 
-    q: "Is there free Wi-Fi?", 
-    a: "Absolutely. We offer high-speed fiber internet free for all customers. Just ask a barista for the password!", 
-    open: false 
-  },
-  { 
-    q: "Do you do delivery?", 
-    a: "Yes, we are available on major delivery apps, or you can order for pickup directly through this website.", 
-    open: false 
-  },
+  { q: "Do you offer Vegan options?", a: "Yes! We have Almond, Oat, and Soy milk available for all our coffee and tea drinks.", open: false },
+  { q: "Can I book a table for a meeting?", a: "We operate on a first-come, first-served basis. However, for groups larger than 6, please give us a call.", open: false },
+  { q: "Is there free Wi-Fi?", a: "Absolutely. We offer high-speed fiber internet free for all customers.", open: false },
+  { q: "Do you do delivery?", a: "Yes, we are available on major delivery apps, or you can order for pickup directly through this website.", open: false },
 ])
 
 const toggleFaq = (index) => {
   faqs.value[index].open = !faqs.value[index].open
 }
 
-const handleSubmit = () => {
-  if(!form.value.name || !form.value.email) return alert('Please fill in required fields')
+const handleSubmit = async () => {
+  // 🟢 3. Use Toast for validation error
+  if(!form.value.name || !form.value.email || !form.value.message) {
+    return store.showToast('Please fill in all fields (Name, Email, and Message)', 'warning')
+  }
   
   isSending.value = true
   
-  // Simulate API call
-  setTimeout(() => {
-    isSending.value = false
-    showSuccess.value = true
+  try {
+    await axios.post('http://localhost:5000/api/contact', form.value)
+    
+    // 🟢 4. Use Toast for success
+    store.showToast('Message sent successfully! We will contact you soon.', 'success')
     form.value = { name: '', email: '', message: '' }
     
-    setTimeout(() => showSuccess.value = false, 5000)
-  }, 1500)
+  } catch (error) {
+    console.error("Error sending message:", error)
+    // 🟢 5. Use Toast for server error
+    store.showToast('Failed to send message. Please check your connection and try again.', 'error')
+  } finally {
+    isSending.value = false
+  }
 }
 </script>
 
@@ -88,7 +85,7 @@ const handleSubmit = () => {
             </div>
             <div>
               <h3 class="font-bold text-gray-900 text-lg">Phone</h3>
-              <p class="text-gray-500 text-sm font-medium">+855 12 345 678</p>
+              <p class="text-gray-500 text-sm font-medium">+855 10 719628</p>
             </div>
           </div>
 
@@ -98,7 +95,7 @@ const handleSubmit = () => {
             </div>
             <div>
               <h3 class="font-bold text-gray-900 text-lg">Email</h3>
-              <p class="text-gray-500 text-sm font-medium">hello@cafex.com</p>
+              <p class="text-gray-500 text-sm font-medium">vongsokpheak4@gmail.com</p>
             </div>
           </div>
 
@@ -113,7 +110,7 @@ const handleSubmit = () => {
           </div>
 
           <div class="bg-gray-200 rounded-2xl h-64 w-full overflow-hidden shadow-lg relative group border-4 border-white">
-            <img src="https://images.unsplash.com/photo-1524661135-423995f22d0b?w=800" class="w-full h-full object-cover grayscale group-hover:grayscale-0 transition duration-700">
+            <iframe src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d250151.16277564838!2d104.72537728871423!3d11.579654003814133!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3109513dc76a6be3%3A0x9c010ee85ab525bb!2sPhnom%20Penh!5e0!3m2!1sen!2skh!4v1771122796784!5m2!1sen!2skh" width="600" height="450" style="border:0;" allowfullscreen="" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
             <div class="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-transparent transition">
               <span class="bg-white text-gray-900 px-6 py-2 rounded-full text-sm font-bold shadow-xl flex items-center gap-2 transform group-hover:scale-110 transition-transform">
                 <MapPinIcon class="w-4 h-4 text-red-500" /> View on Google Maps
@@ -149,13 +146,6 @@ const handleSubmit = () => {
                 <span v-else>Send Message</span>
                 <PaperAirplaneIcon v-if="!isSending" class="w-5 h-5 -rotate-45 mt-[-2px]" />
               </button>
-
-              <transition name="fade">
-                <div v-if="showSuccess" class="mt-4 p-4 bg-green-50 text-green-700 rounded-xl font-medium flex items-center gap-3 border border-green-100">
-                  <span class="bg-green-200 p-1 rounded-full text-green-800">✓</span> 
-                  Message sent successfully! We will contact you soon.
-                </div>
-              </transition>
             </div>
           </form>
         </div>
@@ -194,9 +184,6 @@ const handleSubmit = () => {
 </template>
 
 <style scoped>
-.fade-enter-active, .fade-leave-active { transition: opacity 0.5s ease; }
-.fade-enter-from, .fade-leave-to { opacity: 0; }
-
 .animate-fade-in-up {
   animation: fadeInUp 0.8s ease-out forwards;
   opacity: 0;
