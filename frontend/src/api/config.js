@@ -1,7 +1,7 @@
 import axios from 'axios';
 
-// 👇 I updated this with your specific Ngrok URL
-const API_URL = 'https://tutto-joyously-alayna.ngrok-free.dev/api'; 
+// Connecting to the backend on your VM!
+const API_URL = 'http://192.168.91.129:5000/api';  
 
 const api = axios.create({
   baseURL: API_URL,
