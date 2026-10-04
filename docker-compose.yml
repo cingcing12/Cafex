@@ -36,24 +36,10 @@ services:
     build: ./frontend
     container_name: frontend
     restart: always
-    expose:
-      - "80"
+    ports:
+      - "8080:80"
     depends_on:
       - backend
-
-  # Nginx Proxy Manager (Handles HTTPS and Domain Routing)
-  nginx-proxy-manager:
-    image: 'jc21/nginx-proxy-manager:latest'
-    container_name: nginx_manager
-    restart: always
-    ports:
-      - '80:80'
-      - '81:81'
-      - '443:443'
-    volumes:
-      - ./nginx/data:/data
-      - ./nginx/letsencrypt:/etc/letsencrypt
-
 
 volumes:
   db_data:

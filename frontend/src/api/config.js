@@ -1,7 +1,7 @@
 import axios from 'axios';
 
-// Connecting to your secure DuckDNS domain!
-const API_URL = 'https://cafex-homework.duckdns.org/api';   
+// Connecting to your DuckDNS domain directly on port 5000
+const API_URL = 'http://cafex-homework.duckdns.org:5000/api';   
 
 const api = axios.create({
   baseURL: API_URL,
