@@ -1,7 +1,7 @@
 import axios from 'axios';
 
-// Connecting to the backend on your VM!
-const API_URL = 'http://192.168.91.129:5000/api';  
+// Connecting to your secure DuckDNS domain!
+const API_URL = 'https://cafex-homework.duckdns.org/api';   
 
 const api = axios.create({
   baseURL: API_URL,
