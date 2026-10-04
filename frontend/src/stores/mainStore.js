@@ -4,7 +4,7 @@ import api from '@/api/config'
 import io from 'socket.io-client'
 
 // 🟢 Socket Connection
-const socket = io('http://cafex-homework.duckdns.org:5000', {
+const socket = io('https://tutto-joyously-alayna.ngrok-free.dev', {
   transports: ['websocket', 'polling'], 
   extraHeaders: { "ngrok-skip-browser-warning": "true" }
 });

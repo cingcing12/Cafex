@@ -13,7 +13,7 @@ import {
 } from '@heroicons/vue/24/solid'
 
 const store = useMainStore()
-const socket = io('http://cafex-homework.duckdns.org:5000', { 
+const socket = io('https://tutto-joyously-alayna.ngrok-free.dev', { 
   transports: ['websocket', 'polling'], 
   extraHeaders: { "ngrok-skip-browser-warning": "true" } 
 })

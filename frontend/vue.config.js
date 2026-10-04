@@ -5,7 +5,7 @@ module.exports = defineConfig({
   lintOnSave: false,
 
   publicPath: process.env.NODE_ENV === 'production'
-    ? '/'
+    ? '/Cafex/'
     : '/',
 
   // Correct Vue CLI configuration:

@@ -1,7 +1,7 @@
 import axios from 'axios';
 
-// Connecting to your DuckDNS domain directly on port 5000
-const API_URL = 'http://cafex-homework.duckdns.org:5000/api';   
+// 👇 I updated this with your specific Ngrok URL
+const API_URL = 'https://tutto-joyously-alayna.ngrok-free.dev/api';   
 
 const api = axios.create({
   baseURL: API_URL,
