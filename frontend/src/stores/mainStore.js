@@ -4,7 +4,7 @@ import api from '@/api/config'
 import io from 'socket.io-client'
 
 // 🟢 Socket Connection
-const socket = io('https://tutto-joyously-alayna.ngrok-free.dev', {
+const socket = io('http://192.168.91.129:5000', {
   transports: ['websocket', 'polling'], 
   extraHeaders: { "ngrok-skip-browser-warning": "true" }
 });
